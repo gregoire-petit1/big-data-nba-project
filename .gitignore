@@ -1,0 +1,47 @@
+# Environment variables
+.env
+
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ruff cache
+.ruff_cache/
+
+# Logs
+*.log
+
+# Spark
+spark-warehouse/
+metastore_db/
+
+# Airflow
+airflow.db
+airflow.cfg
+logs/
+
+# MinIO data (if mounted locally)
+minio_data/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Docker
+.docker/
