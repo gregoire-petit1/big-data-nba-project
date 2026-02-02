@@ -9,16 +9,16 @@ A complete big data pipeline for NBA analytics using Apache Spark, Apache Airflo
 │   Sources   │────▶│   Ingestion │────▶│  Data Lake  │────▶│   Spark     │
 │  (APIs)     │     │  (Python)   │     │   (MinIO)   │     │(Processing) │
 └─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
-                                                                    │
-                              ┌─────────────┐     ┌─────────────┐   │
-                              │   Kibana    │◀────│Elasticsearch│◀──┘
-                              │ (Dashboard) │     │  (Index)    │
-                              └─────────────┘     └─────────────┘
-                                                                    
-                              ┌─────────────┐
-                              │   Airflow   │
-                              │  (Orchestr.)│
-                              └─────────────┘
+                                                                   │
+                             ┌─────────────┐     ┌─────────────┐   │
+                             │   Kibana    │◀────│Elasticsearch│◀──┘
+                             │ (Dashboard) │     │  (Index)    │
+                             └─────────────┘     └─────────────┘
+
+                             ┌─────────────┐
+                             │   Airflow   │
+                             │  (Orchestr.)│
+                             └─────────────┘
 ```
 
 ## Data Sources
@@ -114,6 +114,7 @@ nano .env  # or use your preferred editor
 ```
 
 **Required variables:**
+
 ```env
 # API keys (get from the respective websites)
 BALDONTLIE_API_KEY=your_balldontlie_api_key_here
@@ -141,6 +142,7 @@ docker-compose up -d
 ```
 
 This will start:
+
 - Airflow (webserver + scheduler) - http://localhost:8080
 - Spark (master + worker) - http://localhost:8081
 - MinIO - http://localhost:9000 (console: http://localhost:9001)
@@ -149,6 +151,7 @@ This will start:
 - PostgreSQL (Airflow metadata)
 
 **Default Airflow credentials:**
+
 - Username: `admin`
 - Password: `admin`
 
@@ -163,6 +166,7 @@ The pipeline runs automatically via Airflow DAG. To trigger manually:
 5. Click "Trigger DAG" (play button)
 
 Or trigger via CLI:
+
 ```bash
 docker-compose exec airflow-webserver airflow dags trigger nba_pipeline
 ```
