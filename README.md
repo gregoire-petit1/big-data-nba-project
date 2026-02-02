@@ -155,6 +155,8 @@ This will start:
 - Username: `admin`
 - Password: `admin`
 
+> ⚠️ **Security Note**: These are default credentials for local development only. Change `AIRFLOW_ADMIN_USERNAME` and `AIRFLOW_ADMIN_PASSWORD` in `.env` before deploying to production.
+
 ### 4. Run the Pipeline
 
 The pipeline runs automatically via Airflow DAG. To trigger manually:
