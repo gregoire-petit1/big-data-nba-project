@@ -1,0 +1,94 @@
+{
+  "objects": [
+    {
+      "id": "nba_team_metrics",
+      "type": "index-pattern",
+      "attributes": {
+        "title": "nba_team_metrics",
+        "timeFieldName": "game_date",
+        "fields": "[{\"name\":\"game_id\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"game_date\",\"type\":\"date\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"season\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"team_id\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"team_name\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"conference\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"division\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"is_home\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"points_for\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"points_against\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"wins_last5\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"win_rate_last5\",\"type\":\"float\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"avg_points_last5\",\"type\":\"float\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"home_away_diff\",\"type\":\"float\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"rest_days\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"venue_name\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"venue_city\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"venue_capacity\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true}]"
+      }
+    },
+    {
+      "id": "nba_match_metrics",
+      "type": "index-pattern",
+      "attributes": {
+        "title": "nba_match_metrics",
+        "timeFieldName": "game_date",
+        "fields": "[{\"name\":\"game_id\",\"type\":\"keyword\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"game_date\",\"type\":\"date\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"season\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"home_team_id\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"visitor_team_id\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"home_team_score\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"visitor_team_score\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"home_win\",\"type\":\"integer\",\"aggregatable\":true,\"searchable\":true},{\"name\":\"win_probability_home\",\"type\":\"float\",\"aggregatable\":true,\"searchable\":true}]"
+      }
+    },
+    {
+      "id": "win-rate-by-team",
+      "type": "visualization",
+      "attributes": {
+        "title": "Win Rate by Team",
+        "visState": "{\"type\":\"bar\",\"params\":{\"type\":\"bar\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"left\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Team\"},\"axisPosition\":\"left\"}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"bottom\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Win Rate Last 5\"},\"axisPosition\":\"bottom\"}],\"seriesParams\":[{\"show\":true,\"type\":\"bar\",\"data\":{\"id\":\"1\",\"type\":\"series\"},\"valueAxis\":\"ValueAxis-1\",\"drawLinesBetweenPoints\":true,\"interpolate\":\"linear\",\"mode\":\"stacked\"}],\"addTooltip\":true,\"addLegend\":false,\"times\":[],\"addTimeMarker\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"win_rate_last5\",\"customLabel\":\"Win Rate\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"team_name\",\"orderBy\":\"1\",\"size\":30,\"order\":\"desc\",\"customLabel\":\"Team\"}}],\"listeners\":{}}"
+      }
+    },
+    {
+      "id": "avg-points-last5",
+      "type": "visualization",
+      "attributes": {
+        "title": "Average Points Last 5 Games",
+        "visState": "{\"type\":\"bar\",\"params\":{\"type\":\"bar\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"left\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Team\"},\"axisPosition\":\"left\"}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"bottom\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Avg Points\"},\"axisPosition\":\"bottom\"}],\"seriesParams\":[{\"show\":true,\"type\":\"bar\",\"data\":{\"id\":\"1\",\"type\":\"series\"},\"valueAxis\":\"ValueAxis-1\",\"drawLinesBetweenPoints\":true,\"interpolate\":\"linear\",\"mode\":\"stacked\"}],\"addTooltip\":true,\"addLegend\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"avg_points_last5\",\"customLabel\":\"Avg Points Last 5\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"team_name\",\"orderBy\":\"1\",\"size\":30,\"order\":\"desc\",\"customLabel\":\"Team\"}}]}"
+      }
+    },
+    {
+      "id": "home-vs-away-performance",
+      "type": "visualization",
+      "attributes": {
+        "title": "Home vs Away Performance",
+        "visState": "{\"type\":\"pie\",\"params\":\"pie\",\"pie\":{\"type\":{\"legendPosition\":\"right\",\"truncateLabels\":0,\"show\":true,\"labels\":{\"show\":false,\"truncate\":100}},\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"isDonut\":false,\"labels\":{\"show\":false,\"values\":true,\"truncate\":100}},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"schema\":\"metric\",\"params\":{\"field\":\"is_win\",\"customLabel\":\"Wins\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"is_home\",\"customLabel\":\"Home/Away\",\"size\":2,\"order\":\"desc\",\"orderBy\":\"1\"}}]}"
+      }
+    },
+    {
+      "id": "win-probability-distribution",
+      "type": "visualization",
+      "attributes": {
+        "title": "Win Probability Distribution",
+        "visState": "{\"type\":\"histogram\",\"params\":{\"type\":\"histogram\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"bottom\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Win Probability Home\"},\"axisPosition\":\"bottom\",\"style\":{\"fontSize\":10}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"left\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Count\"},\"axisPosition\":\"left\"}],\"seriesParams\":[{\"show\":true,\"type\":\"histogram\",\"data\":{\"id\":\"1\",\"type\":\"series\"},\"valueAxis\":\"ValueAxis-1\",\"interpolate\":\"linear\",\"mode\":\"stacked\"}],\"addTooltip\":true,\"addLegend\":false,\"truncateLegend\":true,\"legendPosition\":\"right\",\"times\":[],\"addTimeMarker\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{\"customLabel\":\"Matches\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"histogram\",\"schema\":\"segment\",\"params\":{\"field\":\"win_probability_home\",\"interval\":0.1,\"customLabel\":\"Win Probability\",\"minDocCount\":0}}]}"
+      }
+    },
+    {
+      "id": "conference-win-rates",
+      "type": "visualization",
+      "attributes": {
+        "title": "Win Rate by Conference",
+        "visState": "{\"type\":\"bar\",\"params\":{\"type\":\"bar\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"left\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Conference\"},\"axisPosition\":\"left\"}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"bottom\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Win Rate\"},\"axisPosition\":\"bottom\"}],\"seriesParams\":[{\"show\":true,\"type\":\"bar\",\"data\":{\"id\":\"1\",\"type\":\"series\"},\"valueAxis\":\"ValueAxis-1\",\"drawLinesBetweenPoints\":true,\"interpolate\":\"linear\",\"mode\":\"stacked\"}],\"addTooltip\":true,\"addLegend\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"win_rate_last5\",\"customLabel\":\"Win Rate\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"conference\",\"orderBy\":\"1\",\"size\":2,\"order\":\"desc\",\"customLabel\":\"Conference\"}}]}"
+      }
+    },
+    {
+      "id": "rest-days-vs-win",
+      "type": "visualization",
+      "attributes": {
+        "title": "Rest Days vs Win Rate",
+        "visState": "{\"type\":\"line\",\"params\":{\"type\":\"line\",\"grid\":{\"categoryLines\":false,\"style\":{\"color\":\"#eee\"}},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"bottom\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Rest Days\"},\"axisPosition\":\"bottom\"}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"labels\":{\"show\":true,\"truncate\":100},\"position\":\"left\",\"scale\":{\"type\":\"linear\"},\"show\":true,\"title\":{\"text\":\"Win Rate\"},\"axisPosition\":\"left\"}],\"seriesParams\":[{\"show\":true,\"type\":\"line\",\"data\":{\"id\":\"1\",\"type\":\"series\"},\"valueAxis\":\"ValueAxis-1\",\"drawLinesBetweenPoints\":true,\"interpolate\":\"linear\",\"mode\":\"normal\"}],\"addTooltip\":true,\"addLegend\":false,\"times\":[],\"addTimeMarker\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"win_rate_last5\",\"customLabel\":\"Win Rate\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"rest_days\",\"orderBy\":\"1\",\"size\":10,\"order\":\"asc\",\"customLabel\":\"Rest Days\"}}]}"
+      }
+    },
+    {
+      "id": "nba-dashboard",
+      "type": "dashboard",
+      "attributes": {
+        "title": "NBA Analytics Dashboard",
+        "hits": 0,
+        "timeRestore": false,
+        "optionsJSON": "{\"darkMode\":false}",
+        "panelsJSON": "[{\"version\":\"7.17.0\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":8,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{\"vis\":{\"colors\":{\"home_win\":\"#7EB26D\"}},\"sort\":[]},\"panelRefName\":\"panel_1\"},{\"version\":\"7.17.0\",\"gridData\":{\"x\":0,\"y\":8,\"w\":12,\"h\":8,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{\"sort\":[]},\"panelRefName\":\"panel_2\"},{\"version\":\"7.17.0\",\"gridData\":{\"x\":12,\"y\":8,\"w\":12,\"h\":8,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{\"sort\":[]},\"panelRefName\":\"panel_3\"},{\"version\":\"7.17.0\",\"gridData\":{\"x\":0,\"y\":16,\"w\":12,\"h\":8,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{\"sort\":[]},\"panelRefName\":\"panel_4\"},{\"version\":\"7.17.0\",\"gridData\":{\"x\":12,\"y\":16,\"w\":12,\"h\":8,\"i\":\"5\"},\"panelIndex\":\"5\",\"embeddableConfig\":{\"sort\":[]},\"panelRefName\":\"panel_5\"}]",
+        "refreshInterval": {
+          "pause": true,
+          "value": 0
+        },
+        "timeFrom": "now-30d",
+        "timeTo": "now"
+      },
+      "references": [
+        {"name": "panel_1", "type": "visualization", "id": "win-rate-by-team"},
+        {"name": "panel_2", "type": "visualization", "id": "avg-points-last5"},
+        {"name": "panel_3", "type": "visualization", "id": "home-vs-away-performance"},
+        {"name": "panel_4", "type": "visualization", "id": "win-probability-distribution"},
+        {"name": "panel_5", "type": "visualization", "id": "conference-win-rates"}
+      ]
+    }
+  ]
+}

@@ -30,21 +30,63 @@ def main() -> None:
     match_df = spark.read.parquet(match_path)
     team_df = spark.read.parquet(team_path)
 
-    home_team_features = team_df.filter(col("is_home") == 1).select(
+    home_team_df = team_df.filter(col("is_home") == 1).select(
         "game_id",
-        "avg_points_last5",
-        "win_rate_last5",
-        "rest_days",
+        col("avg_points_last5").alias("home_avg_points_last5"),
+        col("win_rate_last5").alias("home_win_rate_last5"),
+        col("rest_days").alias("home_rest_days"),
+    )
+
+    away_team_df = team_df.filter(col("is_home") == 0).select(
+        "game_id",
+        col("avg_points_last5").alias("away_avg_points_last5"),
+        col("win_rate_last5").alias("away_win_rate_last5"),
+        col("rest_days").alias("away_rest_days"),
     )
 
     features_df = (
-        match_df.join(home_team_features, "game_id", "left")
+        match_df.join(home_team_df, "game_id", "left")
+        .join(away_team_df, "game_id", "left")
         .withColumn("home_label", col("home_win"))
-        .na.fill({"avg_points_last5": 0.0, "win_rate_last5": 0.0, "rest_days": 0.0})
+        .withColumn(
+            "form_diff",
+            col("home_win_rate_last5") - col("away_win_rate_last5"),
+        )
+        .withColumn(
+            "points_diff",
+            col("home_avg_points_last5") - col("away_avg_points_last5"),
+        )
+        .withColumn(
+            "rest_diff",
+            col("home_rest_days") - col("away_rest_days"),
+        )
+        .na.fill(
+            {
+                "home_avg_points_last5": 0.0,
+                "home_win_rate_last5": 0.0,
+                "home_rest_days": 0.0,
+                "away_avg_points_last5": 0.0,
+                "away_win_rate_last5": 0.0,
+                "away_rest_days": 0.0,
+                "form_diff": 0.0,
+                "points_diff": 0.0,
+                "rest_diff": 0.0,
+            }
+        )
     )
 
     assembler = VectorAssembler(
-        inputCols=["avg_points_last5", "win_rate_last5", "rest_days"],
+        inputCols=[
+            "home_avg_points_last5",
+            "home_win_rate_last5",
+            "home_rest_days",
+            "away_avg_points_last5",
+            "away_win_rate_last5",
+            "away_rest_days",
+            "form_diff",
+            "points_diff",
+            "rest_diff",
+        ],
         outputCol="features",
     )
     assembled = assembler.transform(features_df)

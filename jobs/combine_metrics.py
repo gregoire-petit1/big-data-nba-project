@@ -80,6 +80,49 @@ def compute_rest_days(team_games_df):
     return rest_days
 
 
+def compute_schedule_difficulty(team_games_df, horizon=5):
+    """
+    Compute strength of schedule for next N games.
+    
+    difficulty = opponent_win_rate 
+      × (1 + (is_away? 0.20 : 0))      
+      × (1 + (is_b2b? 0.20 : 0))
+    
+    Simplified version: count home/away in next 5 games
+    """
+    from pyspark.sql.functions import lead
+    
+    future_window = Window.partitionBy("team_id").orderBy(col("game_date").asc())
+    
+    # Create columns for next game's home/away status
+    sos_df = team_games_df
+    for i in range(1, horizon + 1):
+        sos_df = sos_df.withColumn(f"next_is_home_{i}", lead("is_home", i).over(future_window))
+    
+    # Count home and away games in next horizon games
+    home_cols = [col(f"next_is_home_{i}") == 1 for i in range(1, horizon + 1)]
+    away_cols = [col(f"next_is_home_{i}") == 0 for i in range(1, horizon + 1)]
+    
+    from pyspark.sql.functions import sum as spark_sum
+    
+    sos_df = sos_df.withColumn(
+        "home_games_next5",
+        sum([when(c, 1).otherwise(0) for c in home_cols])
+    ).withColumn(
+        "away_games_next5",
+        sum([when(c, 1).otherwise(0) for c in away_cols])
+    )
+    
+    # Simplified difficulty: (away games * 0.20 + baseline) / horizon
+    # This gives higher difficulty for more away games
+    sos_df = sos_df.withColumn(
+        "schedule_difficulty_next5",
+        ((col("away_games_next5") * 0.20 + horizon) / horizon).cast("float")
+    )
+    
+    return sos_df
+
+
 def main() -> None:
     args = parse_args()
     run_date = args.run_date or dt.date.today().isoformat()
