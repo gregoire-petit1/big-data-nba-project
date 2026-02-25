@@ -57,6 +57,7 @@ big-data-nba-project/
 │   ├── index_team_metrics.py
 │   ├── spark_utils.py
 │   └── train_predict.py
+├── kibana/                 # Kibana dashboards and saved objects
 ├── docker-compose.yml      # Docker services orchestration
 ├── .env.example            # Environment variables template
 └── README.md               # This file
@@ -178,23 +179,33 @@ docker-compose exec airflow-webserver airflow dags trigger nba_pipeline
 Once the pipeline completes:
 
 1. Open Kibana: http://localhost:5601
-2. Create index patterns:
+2. Import saved objects (optional): `bash kibana/import_saved_objects.sh`
+3. Create index patterns:
    - `nba_team_metrics`
    - `nba_match_metrics`
-3. Build visualizations and dashboards
+4. Build visualizations and dashboards
 
 ## Pipeline Stages
 
 1. **Ingestion**: Fetch data from APIs and store in MinIO (raw layer)
 2. **Formatting**: Clean and convert to Parquet (formatted layer)
-3. **Combination**: Join datasets and compute KPIs (combined layer)
-4. **ML Prediction**: Train logistic regression model to predict win probability
+3. **Combination**: Join datasets and compute KPIs (combined layer) including Strength of Schedule
+4. **ML Prediction**: Train logistic regression model with home/away and differential features
 5. **Indexing**: Load data into Elasticsearch for visualization
 
 ## Key Metrics
 
-- **Team Metrics**: Win rate, average points, home/away performance
-- **Match Metrics**: Win probability, rest days, recent form
+### Team Metrics
+- Win rate, average points, home/away performance
+- Schedule difficulty (next 5 games)
+- Home/away game distribution in upcoming schedule
+
+### Match Metrics
+- Win probability (predicted via logistic regression)
+- Rest days between games
+- Recent form (weighted by recency)
+- Strength of Schedule impact
+- Home/away differential features
 
 ## Development
 
