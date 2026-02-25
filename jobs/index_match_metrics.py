@@ -51,8 +51,6 @@ def main() -> None:
         config.s3a_path(f"data/combined/nba/match_metrics_with_preds/dt={run_date}")
     )
     
-    # Limit to 1000 rows for demo (fix the combine_metrics bug for full data)
-    df = df.limit(1000)
     print(f"Total rows: {df.count()}")
     
     # Collect in batches
