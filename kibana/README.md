@@ -31,6 +31,8 @@ chmod +x kibana/import_saved_objects.sh
 | 4 | **Win Rate by Conference** | Bar Chart | East vs West comparison |
 | 5 | **Rest Days Impact** | Line Chart | Win rate by rest_days |
 | 6 | **Team Rankings Table** | Data Table | Teams ranked by multiple KPIs |
+| 7 | **Schedule Difficulty by Team** | Bar Chart | SOS (next 5) by team |
+| 8 | **SOS Ranking Table** | Data Table | Teams ranked by schedule difficulty |
 
 ### nba_match_metrics Index
 
@@ -92,6 +94,9 @@ Add these to your dashboard:
 - `home_away_diff` - Points diff at home
 - `rest_days` - Days since last game
 - `game_date` - Date of game
+- `schedule_difficulty_next5` - Schedule difficulty (next 5 games)
+- `home_games_next5` - Number of home games in next 5
+- `away_games_next5` - Number of away games in next 5
 
 ### nba_match_metrics
 - `home_team_id` / `visitor_team_id` - Team IDs
@@ -143,3 +148,21 @@ Add these to your dashboard:
    - Split table: Terms on `conference` (optional)
 5. Sort by: Win Rate descending
 6. Enable "Show partial rows" if some teams have missing data
+
+### Bar Chart: Schedule Difficulty by Team
+
+1. Visualization → Bar Chart
+2. Index: nba_team_metrics
+3. Y-Axis: Avg of schedule_difficulty_next5
+4. X-Axis: Terms on team_name
+5. Sort: Descending
+
+### Table: SOS Ranking
+
+1. Visualization → Table
+2. Index: nba_team_metrics
+3. Metrics: 
+   - Avg schedule_difficulty_next5
+   - Avg home_games_next5
+   - Avg away_games_next5
+4. Buckets: team_name (size: 30, sort by schedule_difficulty_next5: Descending)
