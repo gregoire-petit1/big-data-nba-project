@@ -143,6 +143,7 @@ def main() -> None:
 
     team_kpis = compute_team_kpis(games_df)
     team_kpis = compute_rest_days(team_kpis)
+    team_kpis = compute_schedule_difficulty(team_kpis, horizon=5)
 
     team_dim = teams_df.join(thesportsdb_df, on="team_name_norm", how="left")
 
@@ -180,6 +181,9 @@ def main() -> None:
             "avg_points_last5",
             "home_away_diff",
             "rest_days",
+            "schedule_difficulty_next5",
+            "home_games_next5",
+            "away_games_next5",
             "thesportsdb_team_id",
             "thesportsdb_team_name",
             "team_website",
