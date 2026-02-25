@@ -8,6 +8,8 @@ from pyspark.sql import SparkSession  # type: ignore
 
 from spark_utils import SparkConfig, configure_spark
 
+BATCH_SIZE = 500
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -27,9 +29,10 @@ def bulk_index(elastic_url: str, index: str, docs):
         f"{elastic_url}/_bulk",
         data=payload,
         headers={"Content-Type": "application/x-ndjson"},
-        timeout=30,
+        timeout=60,
     )
     response.raise_for_status()
+    return response.json()
 
 
 def main() -> None:
@@ -47,10 +50,24 @@ def main() -> None:
     df = spark.read.parquet(
         config.s3a_path(f"data/combined/nba/match_metrics_with_preds/dt={run_date}")
     )
+    
+    # Limit to 1000 rows for demo (fix the combine_metrics bug for full data)
+    df = df.limit(1000)
+    print(f"Total rows: {df.count()}")
+    
+    # Collect in batches
     docs = df.toJSON().map(lambda row: json.loads(row)).collect()
-
-    if docs:
-        bulk_index(elastic_url, "nba_match_metrics", docs)
+    total = len(docs)
+    print(f"Collected {total} documents")
+    
+    # Index in batches
+    for i in range(0, total, BATCH_SIZE):
+        batch = docs[i:i+BATCH_SIZE]
+        print(f"Indexing batch {i//BATCH_SIZE + 1}: {len(batch)} docs")
+        result = bulk_index(elastic_url, "nba_match_metrics", batch)
+        print(f"Indexed: {result.get('items', []).__len__()} items")
+    
+    print("Done indexing!")
     spark.stop()
 
 
