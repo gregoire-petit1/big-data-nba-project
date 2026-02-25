@@ -42,7 +42,7 @@ with DAG(
         bash_command=(
             "python /opt/airflow/ingestion/ingest_balldontlie.py "
             f"--season-start {SEASON_START} --season-end {SEASON_END} "
-            f"--run-date {RUN_DATE}"
+            f"--run-date {RUN_DATE} --parallel"
         ),
     )
 
