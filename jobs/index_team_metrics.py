@@ -49,6 +49,16 @@ def main() -> None:
     )
     docs = df.toJSON().map(lambda row: json.loads(row)).collect()
 
+    docs = [
+        {
+            **row,
+            "schedule_difficulty_next5": row.get("schedule_difficulty_next5"),
+            "home_games_next5": row.get("home_games_next5"),
+            "away_games_next5": row.get("away_games_next5"),
+        }
+        for row in docs
+    ]
+
     if docs:
         bulk_index(elastic_url, "nba_team_metrics", docs)
     spark.stop()
