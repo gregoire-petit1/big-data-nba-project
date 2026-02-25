@@ -6,8 +6,8 @@ from airflow.operators.bash import BashOperator  # type: ignore
 
 
 RUN_DATE = "{{ ds }}"
-SEASON_START = 2023
-SEASON_END = 2025
+SEASON_START = 2024
+SEASON_END = 2024
 
 
 def spark_submit(cmd: str) -> str:
