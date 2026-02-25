@@ -2,7 +2,7 @@ import argparse
 import datetime as dt
 
 from pyspark.sql import SparkSession  # type: ignore
-from pyspark.sql.functions import col, lower, regexp_replace, to_date  # type: ignore
+from pyspark.sql.functions import col, explode, lower, regexp_replace, to_date  # type: ignore
 
 from spark_utils import SparkConfig, configure_spark
 
@@ -18,6 +18,12 @@ def format_games(spark: SparkSession, config: SparkConfig, run_date: str) -> Non
         f"data/raw/nba/balldontlie/games/dt={run_date}/games.json"
     )
     df = spark.read.option("multiLine", "true").json(raw_path)
+    
+    # Handle both wrapped and unwrapped formats
+    if "data" in df.columns:
+        df = df.select(explode(col("data")).alias("game"))
+        df = df.select("game.*")
+    
     formatted = (
         df.withColumn("game_id", col("id"))
         .withColumn("game_date", to_date(col("date")))
@@ -48,6 +54,12 @@ def format_teams(spark: SparkSession, config: SparkConfig, run_date: str) -> Non
         f"data/raw/nba/balldontlie/teams/dt={run_date}/teams.json"
     )
     df = spark.read.option("multiLine", "true").json(raw_path)
+    
+    # Handle both wrapped and unwrapped formats
+    if "data" in df.columns:
+        df = df.select(explode(col("data")).alias("team"))
+        df = df.select("team.*")
+    
     formatted = (
         df.withColumn("team_id", col("id"))
         .withColumn("team_name", col("full_name"))
