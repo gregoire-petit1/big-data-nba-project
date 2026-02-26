@@ -25,67 +25,40 @@ def main() -> None:
     configure_spark(spark, config)
 
     match_path = config.s3a_path(f"data/combined/nba/match_metrics/dt={run_date}")
-    team_path = config.s3a_path(f"data/combined/nba/team_metrics/dt={run_date}")
 
     match_df = spark.read.parquet(match_path)
-    team_df = spark.read.parquet(team_path)
-
-    home_team_df = team_df.filter(col("is_home") == 1).select(
-        "game_id",
-        col("avg_points_last5").alias("home_avg_points_last5"),
-        col("win_rate_last5").alias("home_win_rate_last5"),
-        col("rest_days").alias("home_rest_days"),
-    )
-
-    away_team_df = team_df.filter(col("is_home") == 0).select(
-        "game_id",
-        col("avg_points_last5").alias("away_avg_points_last5"),
-        col("win_rate_last5").alias("away_win_rate_last5"),
-        col("rest_days").alias("away_rest_days"),
-    )
 
     features_df = (
-        match_df.join(home_team_df, "game_id", "left")
-        .join(away_team_df, "game_id", "left")
+        match_df
         .withColumn("home_label", col("home_win"))
-        .withColumn(
-            "form_diff",
-            col("home_win_rate_last5") - col("away_win_rate_last5"),
-        )
-        .withColumn(
-            "points_diff",
-            col("home_avg_points_last5") - col("away_avg_points_last5"),
-        )
-        .withColumn(
-            "rest_diff",
-            col("home_rest_days") - col("away_rest_days"),
-        )
-        .na.fill(
-            {
-                "home_avg_points_last5": 0.0,
-                "home_win_rate_last5": 0.0,
-                "home_rest_days": 0.0,
-                "away_avg_points_last5": 0.0,
-                "away_win_rate_last5": 0.0,
-                "away_rest_days": 0.0,
-                "form_diff": 0.0,
-                "points_diff": 0.0,
-                "rest_diff": 0.0,
-            }
-        )
     )
+
+    # Handle nulls in features
+    features_cols = [
+        "home_win_rate_last5", "home_avg_points_last5", "home_rest_days",
+        "away_win_rate_last5", "away_avg_points_last5", "away_rest_days"
+    ]
+    
+    for c in features_cols:
+        features_df = features_df.withColumn(c, col(c).cast("double"))
+    
+    features_df = features_df.na.fill({
+        "home_win_rate_last5": 0.5,
+        "home_avg_points_last5": 100.0,
+        "home_rest_days": 2.0,
+        "away_win_rate_last5": 0.5,
+        "away_avg_points_last5": 100.0,
+        "away_rest_days": 2.0,
+    })
 
     assembler = VectorAssembler(
         inputCols=[
-            "home_avg_points_last5",
             "home_win_rate_last5",
+            "home_avg_points_last5",
             "home_rest_days",
-            "away_avg_points_last5",
             "away_win_rate_last5",
+            "away_avg_points_last5",
             "away_rest_days",
-            "form_diff",
-            "points_diff",
-            "rest_diff",
         ],
         outputCol="features",
     )
@@ -98,11 +71,14 @@ def main() -> None:
 
     output = preds.select(
         "game_id",
+        "game_date",
         "home_team_id",
         "visitor_team_id",
         "home_team_score",
         "visitor_team_score",
         "home_win",
+        "home_team_name",
+        "away_team_name",
         col("prob_array")[1].alias("win_probability_home"),
     )
 
