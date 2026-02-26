@@ -69,7 +69,7 @@ with DAG(
     format_balldontlie = BashOperator(
         task_id="format_balldontlie",
         bash_command=spark_submit(
-            f"/opt/airflow/jobs/format_balldontlie.py --run-date {RUN_DATE}"
+            f"/opt/airflow/jobs/format_balldontlie.py --run-date {RUN_DATE} --all-files"
         ),
     )
 
@@ -83,7 +83,7 @@ with DAG(
     combine_metrics = BashOperator(
         task_id="combine_metrics",
         bash_command=spark_submit(
-            f"/opt/airflow/jobs/combine_metrics.py --run-date {RUN_DATE}"
+            f"/opt/airflow/jobs/combine_metrics.py --run-date {RUN_DATE} --all-files"
         ),
     )
 
