@@ -45,6 +45,37 @@ def put_json(s3, bucket: str, key: str, payload: Any) -> None:
     s3.put_object(Bucket=bucket, Key=key, Body=body)
 
 
+def get_json(s3, bucket: str, key: str) -> Optional[Any]:
+    try:
+        response = s3.get_object(Bucket=bucket, Key=key)
+        return json.loads(response["Body"].read().decode("utf-8"))
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchKey":
+            return None
+        raise
+
+
+METADATA_KEY = "data/metadata/ingestion_last_run.json"
+
+
+def get_last_run_date(s3, bucket: str) -> Optional[str]:
+    """Get the date of the last successful ingestion."""
+    metadata = get_json(s3, bucket, METADATA_KEY)
+    if metadata:
+        return metadata.get("last_date")
+    return None
+
+
+def save_last_run_date(s3, bucket: str, last_date: str, game_count: int) -> None:
+    """Save the date of the last successful ingestion."""
+    metadata = {
+        "last_date": last_date,
+        "last_game_count": game_count,
+        "last_run": dt.datetime.now(dt.timezone.utc).isoformat(),
+    }
+    put_json(s3, bucket, METADATA_KEY, metadata)
+
+
 def fetch_with_retry(session: requests.Session, url: str, params: Dict[str, Any], api_key: str) -> Optional[Dict[str, Any]]:
     """Fetch a single page with exponential backoff retry."""
     backoff = INITIAL_BACKOFF
@@ -211,6 +242,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end-date", type=str, default=None)
     parser.add_argument("--run-date", type=str, default=None)
     parser.add_argument("--parallel", action="store_true", help="Use parallel fetching for faster ingestion")
+    parser.add_argument("--incremental", action="store_true", help="Only fetch games newer than last run (uses metadata)")
     return parser.parse_args()
 
 
@@ -221,25 +253,55 @@ def main() -> None:
     run_date = args.run_date or dt.date.today().isoformat()
     seasons = list(range(args.season_start, args.season_end + 1))
 
+    s3 = get_s3_client()
+    bucket = get_env("MINIO_BUCKET")
+    ensure_bucket(s3, bucket)
+
+    # Incremental mode: determine start_date from last run
+    start_date = args.start_date
+    if args.incremental:
+        last_date = get_last_run_date(s3, bucket)
+        if last_date:
+            # Start from the day after last run
+            last_dt = dt.datetime.strptime(last_date, "%Y-%m-%d")
+            start_date = (last_dt + dt.timedelta(days=1)).strftime("%Y-%m-%d")
+            print(f"Incremental mode: fetching games from {start_date} (last run: {last_date})")
+        else:
+            print("Incremental mode: no previous run found, fetching all data")
+
     print(f"Fetching games for seasons {seasons} (parallel={args.parallel})...")
-    games = fetch_games(base_url, seasons, args.start_date, args.end_date, api_key, parallel=args.parallel)
+    games = fetch_games(base_url, seasons, start_date, args.end_date, api_key, parallel=args.parallel)
     print(f"Total games: {len(games)}")
     
     print("Fetching teams...")
     teams = fetch_teams(base_url, api_key)
 
-    if not games:
+    if not games and not args.incremental:
         raise RuntimeError("No games returned from balldontlie")
 
-    s3 = get_s3_client()
-    bucket = get_env("MINIO_BUCKET")
-    ensure_bucket(s3, bucket)
+    # Save games and teams only if there are new games or not in incremental mode
+    if games or not args.incremental:
+        games_key = build_partition_path("raw", "balldontlie", "games", run_date)
+        teams_key = build_partition_path("raw", "balldontlie", "teams", run_date)
 
-    games_key = build_partition_path("raw", "balldontlie", "games", run_date)
-    teams_key = build_partition_path("raw", "balldontlie", "teams", run_date)
+        if games:
+            put_json(s3, bucket, games_key, games)
+        if teams:
+            put_json(s3, bucket, teams_key, teams)
 
-    put_json(s3, bucket, games_key, games)
-    put_json(s3, bucket, teams_key, teams)
+        # Update last run date
+        if games:
+            # Find the most recent game date
+            dates = [g.get("date") for g in games if g.get("date")]
+            if dates:
+                # Extract just the date part (YYYY-MM-DD)
+                game_dates = [d[:10] for d in dates if d]
+                if game_dates:
+                    latest_date = max(game_dates)
+                    save_last_run_date(s3, bucket, latest_date, len(games))
+                    print(f"Saved last run date: {latest_date} ({len(games)} games)")
+    else:
+        print("No new games to ingest")
 
 
 if __name__ == "__main__":

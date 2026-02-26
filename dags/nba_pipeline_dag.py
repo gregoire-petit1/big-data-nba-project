@@ -9,6 +9,14 @@ RUN_DATE = "{{ ds }}"
 SEASON_START = 2024
 SEASON_END = 2024
 
+# Set to True after first successful full run
+# When True, only new games since last run will be ingested
+INCREMENTAL_MODE = os.getenv("INCREMENTAL_MODE", "false").lower() == "true"
+
+# Full run flag - set to False after initial full ingestion
+# When False, uses --incremental to only fetch new games
+FULL_RUN = os.getenv("FULL_RUN", "true").lower() == "true"
+
 
 def spark_submit(cmd: str) -> str:
     return (
@@ -37,12 +45,17 @@ with DAG(
     catchup=False,
     max_active_runs=1,
 ) as dag:
+    # Build ingestion command based on mode
+    ingest_extra_args = "--parallel"
+    if INCREMENTAL_MODE and not FULL_RUN:
+        ingest_extra_args += " --incremental"
+
     ingest_balldontlie = BashOperator(
         task_id="ingest_balldontlie",
         bash_command=(
             "python /opt/airflow/ingestion/ingest_balldontlie.py "
             f"--season-start {SEASON_START} --season-end {SEASON_END} "
-            f"--run-date {RUN_DATE} --parallel"
+            f"--run-date {RUN_DATE} " + ingest_extra_args
         ),
     )
 
