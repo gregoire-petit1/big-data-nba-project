@@ -47,6 +47,11 @@ def main() -> None:
     elastic_port = os.getenv("ELASTIC_PORT", "9200")
     elastic_url = f"{elastic_host}:{elastic_port}"
 
+    # Delete existing index to avoid duplicates
+    index_name = "nba_match_metrics"
+    print(f"Deleting existing index: {index_name}")
+    requests.delete(f"{elastic_url}/{index_name}", timeout=30)
+    
     df = spark.read.parquet(
         config.s3a_path(f"data/combined/nba/match_metrics_with_preds/dt={run_date}")
     )
