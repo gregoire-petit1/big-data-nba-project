@@ -135,13 +135,14 @@ def main() -> None:
     # Read all formatted games if --all-files flag is set
     if args.all_files:
         games_path = config.s3a_path("data/formatted/nba/balldontlie/games/dt=*")
+        teams_path = config.s3a_path("data/formatted/nba/balldontlie/teams/dt=*")
+        thesportsdb_path = config.s3a_path("data/formatted/nba/thesportsdb/teams/dt=*")
     else:
         games_path = config.s3a_path(f"data/formatted/nba/balldontlie/games/dt={run_date}")
-    
-    teams_path = config.s3a_path(f"data/formatted/nba/balldontlie/teams/dt={run_date}")
-    thesportsdb_path = config.s3a_path(
-        f"data/formatted/nba/thesportsdb/teams/dt={run_date}"
-    )
+        teams_path = config.s3a_path(f"data/formatted/nba/balldontlie/teams/dt={run_date}")
+        thesportsdb_path = config.s3a_path(
+            f"data/formatted/nba/thesportsdb/teams/dt={run_date}"
+        )
 
     games_df = spark.read.parquet(games_path)
     teams_df = spark.read.parquet(teams_path)
