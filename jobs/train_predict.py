@@ -1,11 +1,12 @@
 import argparse
 import datetime as dt
 
-from pyspark.ml.classification import LogisticRegression, RandomForestClassifier
+from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml.evaluation import BinaryClassificationEvaluator, MulticlassClassificationEvaluator
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.functions import vector_to_array
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when
+from pyspark.sql.functions import col, when, lit
 
 from spark_utils import SparkConfig, configure_spark
 
@@ -13,23 +14,16 @@ from spark_utils import SparkConfig, configure_spark
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and predict NBA match outcomes")
     parser.add_argument("--run-date", type=str, default=None)
+    parser.add_argument("--train-season", type=int, default=2024, help="Season year to use for training (start year)")
+    parser.add_argument("--test-season", type=int, default=2025, help="Season year to use for testing")
+    parser.add_argument("--all-files", action="store_true", help="Read all match data files")
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    run_date = args.run_date or dt.date.today().isoformat()
-
-    spark = SparkSession.builder.appName("train_predict").getOrCreate()
-    config = SparkConfig()
-    configure_spark(spark, config)
-
-    match_path = config.s3a_path(f"data/combined/nba/match_metrics/dt={run_date}")
-
-    match_df = spark.read.parquet(match_path)
-
-    features_df = (
-        match_df
+def add_features(df):
+    """Add engineered features to the dataframe."""
+    return (
+        df
         .withColumn("home_label", col("home_win"))
         .withColumn("win_rate_diff", 
             when(col("home_win_rate").isNotNull() & col("away_win_rate").isNotNull(),
@@ -47,7 +41,48 @@ def main() -> None:
         .withColumn("home_advantage", col("home_rest_days") * 0.02)
     )
 
-    features_cols = [
+
+def prepare_features(df, feature_cols):
+    """Prepare features: cast to double, fill nulls, assemble vector."""
+    for c in feature_cols:
+        if c in df.columns:
+            df = df.withColumn(c, col(c).cast("double"))
+    
+    fill_values = {c: 0.5 if "win_rate" in c else 100.0 if "points" in c else 2.0 for c in feature_cols}
+    df = df.na.fill(fill_values)
+    
+    assembler = VectorAssembler(inputCols=feature_cols, outputCol="features", handleInvalid="skip")
+    return assembler.transform(df)
+
+
+def main() -> None:
+    args = parse_args()
+    run_date = args.run_date or dt.date.today().isoformat()
+
+    spark = SparkSession.builder.appName("train_predict").getOrCreate()
+    config = SparkConfig()
+    configure_spark(spark, config)
+
+    # Read match data - either single date or all dates
+    if args.all_files:
+        match_path = config.s3a_path("data/combined/nba/match_metrics/dt=*")
+    else:
+        match_path = config.s3a_path(f"data/combined/nba/match_metrics/dt={run_date}")
+
+    match_df = spark.read.parquet(match_path)
+    print(f"Loaded {match_df.count()} matches")
+
+    # Determine season from game_date (NBA season runs Oct-Jun)
+    # 2024-2025 season: Oct 2024 - Jun 2025
+    # 2025-2026 season: Oct 2025 - Jun 2026
+    match_df = match_df.withColumn(
+        "season_year",
+        when(col("game_date") < "2025-10-01", lit(2024))  # Oct 2024 - Sep 2025 = 2024-2025
+        .otherwise(lit(2025))  # Oct 2025+ = 2025-2026
+    )
+
+    # Add features
+    feature_cols = [
         "home_win_rate", "home_avg_points", "home_avg_points_against",
         "home_win_rate_last5", "home_avg_points_last5", "home_rest_days",
         "away_win_rate", "away_avg_points", "away_avg_points_against",
@@ -56,26 +91,31 @@ def main() -> None:
         "rest_days_diff", "form_last5_diff", "home_advantage"
     ]
     
-    for c in features_cols:
-        if c in features_df.columns:
-            features_df = features_df.withColumn(c, col(c).cast("double"))
+    features_df = add_features(match_df)
+    assembled = prepare_features(features_df, feature_cols)
+
+    # Split into train (2024-2025) and test (2025-2026)
+    train_season = args.train_season
+    test_season = args.test_season
     
-    fill_values = {c: 0.5 if "win_rate" in c else 100.0 if "points" in c else 2.0 for c in features_cols}
-    features_df = features_df.na.fill(fill_values)
+    train_df = assembled.filter(col("season_year") == train_season).filter(col("home_label").isNotNull())
+    test_df = assembled.filter(col("season_year") == test_season).filter(col("home_label").isNotNull())
+    
+    train_count = train_df.count()
+    test_count = test_df.count()
+    print(f"Training set (season {train_season}-{train_season+1}): {train_count} matches")
+    print(f"Test set (season {test_season}-{test_season+1}): {test_count} matches")
 
-    assembler = VectorAssembler(
-        inputCols=[
-            "home_win_rate", "home_avg_points", "home_avg_points_against",
-            "home_win_rate_last5", "home_avg_points_last5", "home_rest_days",
-            "away_win_rate", "away_avg_points", "away_avg_points_against",
-            "away_win_rate_last5", "away_avg_points_last5", "away_rest_days",
-            "win_rate_diff", "avg_points_diff", "avg_points_against_diff",
-            "rest_days_diff", "form_last5_diff", "home_advantage"
-        ],
-        outputCol="features",
-    )
-    assembled = assembler.transform(features_df)
+    if train_count == 0:
+        print("ERROR: No training data found!")
+        spark.stop()
+        return
+    
+    if test_count == 0:
+        print("WARNING: No test data found, using train for evaluation")
+        test_df = train_df
 
+    # Train RandomForest model
     rf = RandomForestClassifier(
         featuresCol="features", 
         labelCol="home_label", 
@@ -83,13 +123,54 @@ def main() -> None:
         maxDepth=5,
         seed=42
     )
-    model = rf.fit(assembled)
-    preds = model.transform(assembled)
-    preds = preds.withColumn("prob_array", vector_to_array(col("probability")))
+    
+    print("Training model...")
+    model = rf.fit(train_df)
+    
+    # Print feature importance
+    print("\nFeature Importance:")
+    importance = model.featureImportances.toArray()
+    for i, col_name in enumerate(feature_cols):
+        print(f"  {col_name}: {importance[i]:.4f}")
 
-    output = preds.select(
+    # Evaluate on training set
+    train_preds = model.transform(train_df)
+    train_preds = train_preds.withColumn("prob_array", vector_to_array(col("probability")))
+    
+    evaluator_auc = BinaryClassificationEvaluator(labelCol="home_label", rawPredictionCol="rawPrediction")
+    evaluator_acc = MulticlassClassificationEvaluator(labelCol="home_label", predictionCol="prediction")
+    
+    train_auc = evaluator_auc.evaluate(train_preds)
+    train_acc = evaluator_acc.evaluate(train_preds, {evaluator_acc.metricName: "accuracy"})
+    print(f"\nTraining Metrics (season {train_season}-{train_season+1}):")
+    print(f"  AUC-ROC: {train_auc:.4f}")
+    print(f"  Accuracy: {train_acc:.4f}")
+
+    # Predict on test set
+    test_preds = model.transform(test_df)
+    test_preds = test_preds.withColumn("prob_array", vector_to_array(col("probability")))
+    
+    test_auc = evaluator_auc.evaluate(test_preds)
+    test_acc = evaluator_acc.evaluate(test_preds, {evaluator_acc.metricName: "accuracy"})
+    print(f"\nTest Metrics (season {test_season}-{test_season+1}):")
+    print(f"  AUC-ROC: {test_auc:.4f}")
+    print(f"  Accuracy: {test_acc:.4f}")
+
+    # Predict on test set (this is what we want to visualize)
+    test_preds = model.transform(test_df)
+    test_preds = test_preds.withColumn("prob_array", vector_to_array(col("probability")))
+    
+    test_auc = evaluator_auc.evaluate(test_preds)
+    test_acc = evaluator_acc.evaluate(test_preds, {evaluator_acc.metricName: "accuracy"})
+    print(f"\nTest Metrics (season {test_season}-{test_season+1}):")
+    print(f"  AUC-ROC: {test_auc:.4f}")
+    print(f"  Accuracy: {test_acc:.4f}")
+
+    # Select output columns (only test predictions for ES)
+    output = test_preds.select(
         "game_id",
         "game_date",
+        "season_year",
         "home_team_id",
         "visitor_team_id",
         "home_team_score",
@@ -98,6 +179,7 @@ def main() -> None:
         "home_team_name",
         "away_team_name",
         col("prob_array")[1].alias("win_probability_home"),
+        "prediction",
         "home_win_rate", "home_avg_points", "home_avg_points_against",
         "home_win_rate_last5", "home_avg_points_last5", "home_rest_days",
         "away_win_rate", "away_avg_points", "away_avg_points_against",
@@ -110,6 +192,7 @@ def main() -> None:
         config.s3a_path(f"data/combined/nba/match_metrics_with_preds/dt={run_date}")
     )
 
+    print("\nModel saved successfully!")
     spark.stop()
 
 
