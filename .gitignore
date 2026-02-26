@@ -45,3 +45,18 @@ build/
 
 # Docker
 .docker/
+
+# LaTeX compilation
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+latexmkrc

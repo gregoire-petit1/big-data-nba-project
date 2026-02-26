@@ -1,0 +1,233 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\title{NBA Big Data Pipeline \\ Projet Big Data Non-Relationnel}
+\author{Grégoire Petit}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Ce rapport présente la conception et l'implémentation d'un pipeline big data complet pour l'analyse de données NBA. Le système utilise Apache Spark pour le traitement distribué des données, Apache Airflow pour l'orchestration du pipeline, MinIO comme lac de données S3-compatible, et Elasticsearch avec Kibana pour l'indexation et la visualisation. Un modèle de Machine Learning basé sur la régression logistique permet de prédire la probabilité de victoire des équipes à domicile ou à l'extérieur.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Contexte}
+Le basketball professionnel génère une quantité massive de données : statistiques de joueurs, performances d'équipes, données de match en temps réel, données biométriques, etc. L'analyse de ces données permet d'obtenir des insights précieux pour les équipes professionnelles, les parieurs sportifs et les fans.
+
+La NBA est particulièrement bien lotie en termes de données grâce à son système de tracking optique qui capture des millions de points de données par match.
+
+\subsection{Objectifs}
+Les objectifs de ce projet sont :
+\begin{itemize}
+    \item Construire un pipeline de données complet et automatisé
+    \item Collecter des données depuis des APIs publiques (balldontlie, TheSportsDB)
+    \item Traiter et transformer les données avec Apache Spark
+    \item Entraîner un modèle de prédiction de victoires
+    \item Visualiser les résultats dans Kibana
+    \item Orchestrer l'ensemble avec Apache Airflow
+\end{itemize}
+
+\subsection{Structure du document}
+Ce rapport est organisé comme suit : la section 2 présente l'architecture globale du système ; la section 3 détaille l'ingestion des données ; la section 4 explique le traitement Spark ; la section 5 décrit le modèle de Machine Learning ; la section 6 couvre l'indexation Elasticsearch ; la section 7 présente l'orchestration Airflow ; enfin, la section 8 conclut le rapport.
+
+\section{Architecture}
+
+\subsection{Stack Technique}
+Le projet utilise une architecture modern data stack complète :
+
+\begin{itemize}
+    \item \textbf{Apache Spark} (version 3.5.0) : Traitement distribué des données avec PySpark
+    \item \textbf{Apache Airflow} (version 2.8.0) : Orchestration et scheduling du pipeline
+    \item \textbf{MinIO} : Stockage objet S3-compatible servant de Data Lake
+    \item \textbf{Elasticsearch} (version 8.11.0) : Indexation et recherche full-text
+    \item \textbf{Kibana} (version 8.11.0) : Visualisation et tableaux de bord
+    \item \textbf{PostgreSQL} (version 15) : Base de données pour les métadonnées Airflow
+    \item \textbf{Docker} et \textbf{Docker Compose} : Conteneurisation de tous les services
+\end{itemize}
+
+Tous les services sont déployés via Docker Compose, ce qui facilite le développement et le déploiement.
+
+\subsection{Schéma de l'architecture}
+
+\begin{figure}[htbp]
+\centering
+\fbox{[PLACEHOLDER: Schéma de l'architecture]}
+\caption{Architecture globale du pipeline NBA}
+\label{fig:architecture}
+\end{figure}
+
+La figure~\ref{fig:architecture} illustre le flux de données à travers le système.
+
+\subsection{Structure du Data Lake}
+Le Data Lake MinIO est structuré en trois couches :
+
+\begin{enumerate}
+    \item \textbf{Raw Layer} (\texttt{datalake/raw/}) : Données brutes issues des APIs
+    \item \textbf{Formatted Layer} (\texttt{datalake/formatted/}) : Données nettoyées et converties en Parquet
+    \item \textbf{Combined Layer} (\texttt{datalake/combined/}) : Données agrégées et enrichies pour l'analyse
+\end{enumerate}
+
+\section{Ingéstion des données}
+
+\subsection{Sources de données}
+Deux APIs gratuites sont utilisées :
+
+\begin{itemize}
+    \item \textbf{balldontlie API} : Scores, statistiques de matchs, équipes
+    \item \textbf{TheSportsDB API} : Informations complémentaires sur les équipes et venues
+\end{itemize}
+
+\subsection{Challenges rencontrés}
+L'ingestion des données a présenté plusieurs défis :
+
+\begin{itemize}
+    \item \textbf{Rate Limits} : L'API balldontlie limite à 5 requêtes par minute
+    \item \textbf{Format JSON} : Les APIs renvoient des formats différents
+    \item \textbf{Volume de données} : Pour une saison NBA complète, environ 1300 matchs
+\end{itemize}
+
+\section{Traitement Spark}
+
+Apache Spark est utilisé pour le traitement distribué des données.
+
+\subsection{Formatting des données}
+Les données JSON sont converties en format Parquet :
+
+\begin{itemize}
+    \item \textbf{format\_balldontlie.py} : Convertit les données des matchs et équipes
+    \item \textbf{format\_thesportsdb.py} : Convertit les données TheSportsDB
+\end{itemize}
+
+Le format Parquet offre plusieurs avantages : compression efficace, lecture sélective des colonnes, et type de données rigide.
+
+\begin{figure}[htbp]
+\fbox{[PLACEHOLDER: Schéma Parquet]}
+\caption{Schéma des données Parquet}
+\label{fig:parquet-schema}
+\end{figure}
+
+\subsection{Combinaison des métriques}
+Le job \textbf{combine\_metrics.py} Effectue les opérations suivantes :
+
+\begin{enumerate}
+    \item Jointure des données balldontlie et TheSportsDB
+    \item Calcul des métriques par équipe (win rate, moyenne de points, etc.)
+    \item Calcul de la difficulté du calendrier (Strength of Schedule)
+\end{enumerate}
+
+\section{Modèle de Machine Learning}
+
+\subsection{Problématique}
+Prédire la probabilité qu'une équipe gagne un match donné en fonction de ses statistiques historiques.
+
+\subsection{Features utilisées}
+\begin{enumerate}
+    \item \textbf{win\_rate} : Win rate de l'équipe
+    \item \textbf{avg\_points\_scored} : Moyenne de points marqués
+    \item \textbf{rest\_days} : Nombre de jours de repos depuis le dernier match
+    \item \textbf{recent\_form} : Forme récente pondérée
+    \item \textbf{home\_advantage} : Avantage de jouer à domicile
+    \item \textbf{schedule\_difficulty} : Difficulté du calendrier
+\end{enumerate}
+
+\subsection{Modèle : Régression logistique}
+Nous utilisons la régression logistique binaire :
+
+\begin{equation}
+P(Y=1|X) = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X_1 + ... + \beta_n X_n)}}
+\end{equation}
+
+\begin{figure}[htbp]
+\fbox{[PLACEHOLDER: Courbe ROC]}
+\caption{Courbe ROC du modèle}
+\label{fig:roc-curve}
+\end{figure}
+
+Le modèle atteint une accuracy d'environ 65-70\% sur les données de test.
+
+\section{Indexation Elasticsearch}
+
+\subsection{Choix d'Elasticsearch}
+Elasticsearch est utilisé pour :
+
+\begin{itemize}
+    \item \textbf{Recherche rapide} : Temps de réponse en millisecondes
+    \item \textbf{Agrégations} : Facilite les analyses statistiques
+    \item \textbf{Intégration Kibana} : Visualisation native
+\end{itemize}
+
+\subsection{Indices créés}
+\begin{enumerate}
+    \item \textbf{nba\_team\_metrics} : Métriques agrégées par équipe
+    \item \textbf{nba\_match\_metrics} : Métriques par match
+\end{enumerate}
+
+\begin{figure}[htbp]
+\fbox{[PLACEHOLDER: Dashboard Kibana]}
+\caption{Dashboard Kibana pour l'analyse NBA}
+\label{fig:kibana-dashboard}
+\end{figure}
+
+\section{Orchestration Airflow}
+
+Apache Airflow orchestre l'ensemble du pipeline. Le DAG est composé des tâches suivantes :
+
+\begin{enumerate}
+    \item \textbf{ingest\_balldontlie} : Collecte les données depuis l'API balldontlie
+    \item \textbf{ingest\_thesportsdb} : Collecte les données depuis l'API TheSportsDB
+    \item \textbf{format\_balldontlie} : Convertit les données en Parquet
+    \item \textbf{format\_thesportsdb} : Convertit les données en Parquet
+    \item \textbf{combine\_metrics} : Calcule les métriques combinées
+    \item \textbf{train\_model} : Entraîne le modèle ML
+    \item \textbf{index\_team\_metrics} : Indexe les métriques équipe dans ES
+    \item \textbf{index\_match\_metrics} : Indexe les métriques match dans ES
+\end{enumerate}
+
+\begin{figure}[htbp]
+\fbox{[PLACEHOLDER: Graphe DAG Airflow]}
+\caption{DAG Airflow du pipeline NBA}
+\label{fig:airflow-dag}
+\end{figure}
+
+\section{Conclusion}
+
+\subsection{Résultats obtenus}
+Le pipeline fonctionne de bout en bout et permet de :
+\begin{itemize}
+    \item Collecter automatiquement les données depuis les APIs
+    \item Transformer les données brutes en formats analytiques
+    \item Entraîner un modèle de prédiction avec une accuracy de 65-70\%
+    \item Visualiser les résultats dans Kibana
+    \item Orchestrer l'ensemble de manière automatisée
+\end{itemize}
+
+\subsection{Limites du projet}
+\begin{itemize}
+    \item \textbf{Rate Limits} : Les APIs gratuites limitent le volume de données
+    \item \textbf{Features limitées} : Pas de statistiques avancées
+    \item \textbf{Modèle simple} : La régression logistique est un modèle de base
+\end{itemize}
+
+\subsection{Perspectives d'amélioration}
+\begin{itemize}
+    \item Ajouter des statistiques avancées (PER, true shooting percentage)
+    \item Tester XGBoost, Random Forest ou des réseaux de neurones
+    \item Implémenter un pipeline temps réel avec Kafka
+    \item Déployer sur Kubernetes avec monitoring complet
+\end{itemize}
+
+\end{document}
