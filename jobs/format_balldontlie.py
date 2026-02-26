@@ -10,19 +10,28 @@ from spark_utils import SparkConfig, configure_spark
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Format balldontlie raw data")
     parser.add_argument("--run-date", type=str, default=None)
+    parser.add_argument("--all-files", action="store_true", help="Read all game files instead of just one run-date")
     return parser.parse_args()
 
 
-def format_games(spark: SparkSession, config: SparkConfig, run_date: str) -> None:
-    raw_path = config.s3a_path(
-        f"data/raw/nba/balldontlie/games/dt={run_date}/games.json"
-    )
+def format_games(spark: SparkSession, config: SparkConfig, run_date: str, all_files: bool = False) -> None:
+    if all_files:
+        # Read ALL game files from all run-dates
+        raw_path = config.s3a_path("data/raw/nba/balldontlie/games/dt=*/games.json")
+    else:
+        raw_path = config.s3a_path(
+            f"data/raw/nba/balldontlie/games/dt={run_date}/games.json"
+        )
+    
     df = spark.read.option("multiLine", "true").json(raw_path)
     
     # Handle both wrapped and unwrapped formats
     if "data" in df.columns:
         df = df.select(explode(col("data")).alias("game"))
         df = df.select("game.*")
+    
+    # Deduplicate by game_id to handle overlapping data from multiple runs
+    df = df.dropDuplicates(["id"])
     
     formatted = (
         df.withColumn("game_id", col("id"))
@@ -44,8 +53,11 @@ def format_games(spark: SparkSession, config: SparkConfig, run_date: str) -> Non
             "status",
         )
     )
+    
+    # Use today's date as partition if reading all files, otherwise use run_date
+    output_date = dt.date.today().isoformat() if all_files else run_date
     formatted.write.mode("overwrite").parquet(
-        config.s3a_path(f"data/formatted/nba/balldontlie/games/dt={run_date}")
+        config.s3a_path(f"data/formatted/nba/balldontlie/games/dt={output_date}")
     )
 
 
@@ -88,7 +100,7 @@ def main() -> None:
     config = SparkConfig()
     configure_spark(spark, config)
 
-    format_games(spark, config, run_date)
+    format_games(spark, config, run_date, all_files=args.all_files)
     format_teams(spark, config, run_date)
 
     spark.stop()

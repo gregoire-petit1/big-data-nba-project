@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
         description="Combine NBA datasets and compute KPIs"
     )
     parser.add_argument("--run-date", type=str, default=None)
+    parser.add_argument("--all-files", action="store_true", help="Read all game files instead of just one run-date")
     return parser.parse_args()
 
 
@@ -131,7 +132,12 @@ def main() -> None:
     config = SparkConfig()
     configure_spark(spark, config)
 
-    games_path = config.s3a_path(f"data/formatted/nba/balldontlie/games/dt={run_date}")
+    # Read all formatted games if --all-files flag is set
+    if args.all_files:
+        games_path = config.s3a_path("data/formatted/nba/balldontlie/games/dt=*")
+    else:
+        games_path = config.s3a_path(f"data/formatted/nba/balldontlie/games/dt={run_date}")
+    
     teams_path = config.s3a_path(f"data/formatted/nba/balldontlie/teams/dt={run_date}")
     thesportsdb_path = config.s3a_path(
         f"data/formatted/nba/thesportsdb/teams/dt={run_date}"
