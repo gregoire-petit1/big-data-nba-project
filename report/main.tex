@@ -89,11 +89,11 @@
 \thispagestyle{fancy}
 
 \begin{abstract}
-\noindent
-Ce rapport présente la conception et l'implémentation d'un pipeline big data de bout en bout pour l'analyse de données NBA.
-Le système ingère des données depuis deux APIs publiques, les stocke dans un data lake MinIO organisé en couches (raw, formatted, combined), les transforme via Apache Spark, entraîne un modèle de Random Forest pour prédire les victoires à domicile, et expose les résultats dans des dashboards Kibana via Elasticsearch.
-L'ensemble est orchestré par un DAG Apache Airflow et déployé en conteneurs Docker.
-Le pipeline calcule plus de 15 KPIs par équipe et par match, incluant des métriques de forme récente, de repos, et de difficulté de calendrier (\textit{Strength of Schedule}).
+  \noindent
+  Ce rapport présente la conception et l'implémentation d'un pipeline big data de bout en bout pour l'analyse de données NBA.
+  Le système ingère des données depuis deux APIs publiques, les stocke dans un data lake MinIO organisé en couches (raw, formatted, combined), les transforme via Apache Spark, entraîne un modèle de Random Forest pour prédire les victoires à domicile, et expose les résultats dans des dashboards Kibana via Elasticsearch.
+  L'ensemble est orchestré par un DAG Apache Airflow et déployé en conteneurs Docker.
+  Le pipeline calcule plus de 15 KPIs par équipe et par match, incluant des métriques de forme récente et de repos entre les matchs.
 \end{abstract}
 
 \newpage
@@ -127,23 +127,23 @@ La section~\ref{sec:archi} présente l'architecture globale. La section~\ref{sec
 \subsection{Stack technique}
 
 \begin{table}[htbp]
-\centering
-\caption{Composants de la stack technique}
-\label{tab:stack}
-\small
-\begin{tabular}{@{} l l l @{}}
-\toprule
-\textbf{Composant} & \textbf{Version} & \textbf{Rôle} \\
-\midrule
-Apache Spark      & 3.5.8  & Traitement distribué, ML (PySpark) \\
-Apache Airflow    & 2.8.3  & Orchestration et scheduling du pipeline \\
-MinIO             & 2024-01 & Data lake S3-compatible (stockage objet) \\
-Elasticsearch     & 8.12.2 & Indexation, recherche, agrégations \\
-Kibana            & 8.12.2 & Dashboards et visualisations \\
-PostgreSQL        & 15     & Métadonnées Airflow \\
-Docker Compose    & --     & Conteneurisation (8 services) \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{Composants de la stack technique}
+  \label{tab:stack}
+  \small
+  \begin{tabular}{@{} l l l @{}}
+    \toprule
+    \textbf{Composant} & \textbf{Version} & \textbf{Rôle}                            \\
+    \midrule
+    Apache Spark       & 3.5.8            & Traitement distribué, ML (PySpark)       \\
+    Apache Airflow     & 2.8.3            & Orchestration et scheduling du pipeline  \\
+    MinIO              & 2024-01          & Data lake S3-compatible (stockage objet) \\
+    Elasticsearch      & 8.12.2           & Indexation, recherche, agrégations       \\
+    Kibana             & 8.12.2           & Dashboards et visualisations             \\
+    PostgreSQL         & 15               & Métadonnées Airflow                      \\
+    Docker Compose     & --               & Conteneurisation (8 services)            \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \subsection{Schéma d'architecture}
@@ -151,61 +151,61 @@ Docker Compose    & --     & Conteneurisation (8 services) \\
 La figure~\ref{fig:architecture} illustre le flux de données à travers les composants du système. Les flèches en pointillés représentent l'orchestration Airflow.
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[scale=0.85, every node/.append style={transform shape},
-  node distance=0.7cm and 0.9cm,
-  block/.style={rectangle, draw, rounded corners=3pt, minimum height=0.9cm, minimum width=2.2cm, font=\small\sffamily, align=center, line width=0.6pt},
-  api/.style={block, fill=blue!10, draw=blue!50},
-  storage/.style={block, fill=minio!10, draw=minio!60},
-  process/.style={block, fill=spark!10, draw=spark!60},
-  index/.style={block, fill=elastic!15, draw=elastic!80!black},
-  viz/.style={block, fill=kibana!15, draw=kibana!60!black},
-  orch/.style={block, fill=airflow!10, draw=airflow!60},
-  arr/.style={-{Stealth[length=5pt]}, thick, gray!70},
-]
-  % APIs
-  \node[api] (api1) {balldontlie\\API};
-  \node[api, below=0.4cm of api1] (api2) {TheSportsDB\\API};
+  \centering
+  \begin{tikzpicture}[scale=0.85, every node/.append style={transform shape},
+    node distance=0.7cm and 0.9cm,
+    block/.style={rectangle, draw, rounded corners=3pt, minimum height=0.9cm, minimum width=2.2cm, font=\small\sffamily, align=center, line width=0.6pt},
+    api/.style={block, fill=blue!10, draw=blue!50},
+    storage/.style={block, fill=minio!10, draw=minio!60},
+    process/.style={block, fill=spark!10, draw=spark!60},
+    index/.style={block, fill=elastic!15, draw=elastic!80!black},
+    viz/.style={block, fill=kibana!15, draw=kibana!60!black},
+    orch/.style={block, fill=airflow!10, draw=airflow!60},
+    arr/.style={-{Stealth[length=5pt]}, thick, gray!70},
+    ]
+    % APIs
+    \node[api] (api1) {balldontlie\\API};
+    \node[api, below=0.4cm of api1] (api2) {TheSportsDB\\API};
 
-  % Ingestion
-  \path (api1) -- (api2) coordinate[midway] (apimid);
-  \node[block, fill=gray!10, right=0.9cm of apimid] (ingest) {Ingestion\\(Python)};
+    % Ingestion
+    \path (api1) -- (api2) coordinate[midway] (apimid);
+    \node[block, fill=gray!10, right=0.9cm of apimid] (ingest) {Ingestion\\(Python)};
 
-  % MinIO
-  \node[storage, right=0.9cm of ingest] (minio) {Data Lake\\MinIO (S3)};
+    % MinIO
+    \node[storage, right=0.9cm of ingest] (minio) {Data Lake\\MinIO (S3)};
 
-  % Spark
-  \node[process, right=0.9cm of minio] (spark) {Spark\\Processing};
+    % Spark
+    \node[process, right=0.9cm of minio] (spark) {Spark\\Processing};
 
-  % ML
-  \node[process, above=0.4cm of spark] (ml) {Spark ML\\(Random Forest)};
+    % ML
+    \node[process, above=0.4cm of spark] (ml) {Spark ML\\(Random Forest)};
 
-  % Elasticsearch
-  \node[index, right=0.9cm of spark] (es) {Elastic-\\search};
+    % Elasticsearch
+    \node[index, right=0.9cm of spark] (es) {Elastic-\\search};
 
-  % Kibana
-  \node[viz, right=0.9cm of es] (kibana) {Kibana\\Dashboard};
+    % Kibana
+    \node[viz, right=0.9cm of es] (kibana) {Kibana\\Dashboard};
 
-  % Airflow
-  \node[orch, below=1.2cm of spark] (airflow) {Airflow (DAG orchestration)};
+    % Airflow
+    \node[orch, below=1.2cm of spark] (airflow) {Airflow (DAG orchestration)};
 
-  % Arrows
-  \draw[arr] (api1.east) -| (ingest.north west);
-  \draw[arr] (api2.east) -| (ingest.south west);
-  \draw[arr] (ingest) -- (minio);
-  \draw[arr] (minio) -- (spark);
-  \draw[arr] (spark) -- (ml);
-  \draw[arr] (ml) -- (spark);
-  \draw[arr] (spark) -- (es);
-  \draw[arr] (es) -- (kibana);
+    % Arrows
+    \draw[arr] (api1.east) -| (ingest.north west);
+    \draw[arr] (api2.east) -| (ingest.south west);
+    \draw[arr] (ingest) -- (minio);
+    \draw[arr] (minio) -- (spark);
+    \draw[arr] (spark) -- (ml);
+    \draw[arr] (ml) -- (spark);
+    \draw[arr] (spark) -- (es);
+    \draw[arr] (es) -- (kibana);
 
-  % Airflow orchestration
-  \draw[arr, dashed, airflow!70] (airflow.west) -| (ingest.south);
-  \draw[arr, dashed, airflow!70] (airflow) -- (spark);
-  \draw[arr, dashed, airflow!70] (airflow.east) -| (es.south);
-\end{tikzpicture}
-\caption{Architecture globale du pipeline NBA}
-\label{fig:architecture}
+    % Airflow orchestration
+    \draw[arr, dashed, airflow!70] (airflow.west) -| (ingest.south);
+    \draw[arr, dashed, airflow!70] (airflow) -- (spark);
+    \draw[arr, dashed, airflow!70] (airflow.east) -| (es.south);
+  \end{tikzpicture}
+  \caption{Architecture globale du pipeline NBA}
+  \label{fig:architecture}
 \end{figure}
 
 \subsection{Structure du data lake (MinIO)}
@@ -213,32 +213,32 @@ La figure~\ref{fig:architecture} illustre le flux de données à travers les com
 Le data lake suit une organisation en trois couches hiérarchiques, partitionnées par date d'exécution~:
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-  level 1/.style={sibling distance=4.8cm, level distance=1.3cm},
-  level 2/.style={sibling distance=2.4cm, level distance=1.2cm},
-  every node/.style={font=\small\ttfamily, align=center},
-  edge from parent/.style={draw, -{Stealth[length=4pt]}, thick},
-  raw/.style={fill=rawcolor!15, draw=rawcolor!50, rounded corners=2pt, inner sep=3pt},
-  fmt/.style={fill=fmtcolor!15, draw=fmtcolor!50, rounded corners=2pt, inner sep=3pt},
-  comb/.style={fill=combcolor!15, draw=combcolor!50, rounded corners=2pt, inner sep=3pt},
-]
-\node[draw, rounded corners, fill=gray!10, inner sep=5pt] {\textbf{datalake/data/}}
-  child { node[raw] {raw/nba/}
-    child { node[raw, font=\scriptsize\ttfamily] {balldontlie/\\games/ teams/} }
-    child { node[raw, font=\scriptsize\ttfamily] {thesportsdb/\\teams/} }
-  }
-  child { node[fmt] {formatted/nba/}
-    child { node[fmt, font=\scriptsize\ttfamily] {balldontlie/\\(Parquet)} }
-    child { node[fmt, font=\scriptsize\ttfamily] {thesportsdb/\\(Parquet)} }
-  }
-  child { node[comb] {combined/nba/}
-    child { node[comb, font=\scriptsize\ttfamily] {team\_metrics/\\match\_metrics/} }
-    child { node[comb, font=\scriptsize\ttfamily] {match\_metrics\\\_with\_preds/} }
-  };
-\end{tikzpicture}
-\caption{Organisation du data lake en couches (raw $\to$ formatted $\to$ combined)}
-\label{fig:datalake}
+  \centering
+  \begin{tikzpicture}[
+    level 1/.style={sibling distance=4.8cm, level distance=1.3cm},
+    level 2/.style={sibling distance=2.4cm, level distance=1.2cm},
+    every node/.style={font=\small\ttfamily, align=center},
+    edge from parent/.style={draw, -{Stealth[length=4pt]}, thick},
+    raw/.style={fill=rawcolor!15, draw=rawcolor!50, rounded corners=2pt, inner sep=3pt},
+    fmt/.style={fill=fmtcolor!15, draw=fmtcolor!50, rounded corners=2pt, inner sep=3pt},
+    comb/.style={fill=combcolor!15, draw=combcolor!50, rounded corners=2pt, inner sep=3pt},
+    ]
+    \node[draw, rounded corners, fill=gray!10, inner sep=5pt] {\textbf{datalake/data/}}
+    child { node[raw] {raw/nba/}
+        child { node[raw, font=\scriptsize\ttfamily] {balldontlie/\\games/ teams/} }
+        child { node[raw, font=\scriptsize\ttfamily] {thesportsdb/\\teams/} }
+      }
+    child { node[fmt] {formatted/nba/}
+        child { node[fmt, font=\scriptsize\ttfamily] {balldontlie/\\(Parquet)} }
+        child { node[fmt, font=\scriptsize\ttfamily] {thesportsdb/\\(Parquet)} }
+      }
+    child { node[comb] {combined/nba/}
+        child { node[comb, font=\scriptsize\ttfamily] {team\_metrics/\\match\_metrics/} }
+        child { node[comb, font=\scriptsize\ttfamily] {match\_metrics\\\_with\_preds/} }
+      };
+  \end{tikzpicture}
+  \caption{Organisation du data lake en couches (raw $\to$ formatted $\to$ combined)}
+  \label{fig:datalake}
 \end{figure}
 
 Chaque sous-répertoire est partitionné par date d'exécution (\texttt{dt=YYYY-MM-DD}), permettant un mode incrémental et la traçabilité des runs.
@@ -250,18 +250,18 @@ Chaque sous-répertoire est partitionné par date d'exécution (\texttt{dt=YYYY-
 \subsection{Sources de données}
 
 \begin{table}[htbp]
-\centering
-\caption{Sources de données utilisées}
-\label{tab:sources}
-\small
-\begin{tabular}{@{} l p{5.5cm} l @{}}
-\toprule
-\textbf{Source} & \textbf{Données fournies} & \textbf{Format} \\
-\midrule
-balldontlie API & Matchs NBA (scores, dates, équipes domicile/extérieur), liste des 30 équipes avec conférence et division & JSON \\
-TheSportsDB API & Détails des équipes~: nom de la salle, ville, capacité, badge, site web & JSON \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{Sources de données utilisées}
+  \label{tab:sources}
+  \small
+  \begin{tabular}{@{} l p{5.5cm} l @{}}
+    \toprule
+    \textbf{Source} & \textbf{Données fournies}                                                                                & \textbf{Format} \\
+    \midrule
+    balldontlie API & Matchs NBA (scores, dates, équipes domicile/extérieur), liste des 30 équipes avec conférence et division & JSON            \\
+    TheSportsDB API & Détails des équipes~: nom de la salle, ville, capacité, badge, site web                                  & JSON            \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \subsection{Stratégie d'ingestion}
@@ -269,7 +269,7 @@ TheSportsDB API & Détails des équipes~: nom de la salle, ville, capacité, bad
 L'ingestion est implémentée en Python pur (module \texttt{ingestion/}) et gère plusieurs défis~:
 
 \begin{itemize}
-  \item \textbf{Rate limiting}~: l'API balldontlie impose une limite de requêtes. Un mécanisme de \textit{retry} avec \textit{exponential backoff} (jusqu'à 5 tentatives) assure la robustesse.
+  \item \textbf{Rate limiting}~: l'API balldontlie impose une limite de requêtes. Un mécanisme de \textit{retry} avec \textit{exponential backoff} (jusqu'à 10 tentatives) assure la robustesse.
   \item \textbf{Pagination}~: la pagination par curseur est gérée automatiquement pour récupérer l'intégralité des matchs d'une saison ($\sim$1\,300 matchs).
   \item \textbf{Parallélisme}~: le mode \texttt{--parallel} utilise un \texttt{ThreadPoolExecutor} pour paralléliser la récupération multi-saisons.
   \item \textbf{Mode incrémental}~: le flag \texttt{--incremental} ne récupère que les matchs postérieurs à la dernière exécution, en s'appuyant sur un fichier de métadonnées (\texttt{ingestion\_last\_run.json}).
@@ -303,89 +303,87 @@ Le job \texttt{combine\_metrics.py} est le c\oe{}ur analytique du pipeline. Il e
   \item \textbf{Jointure croisée}~: les données de matchs (balldontlie) sont jointes avec les informations de salle et localisation (TheSportsDB) via le nom normalisé d'équipe.
   \item \textbf{Dédoublement home/away}~: chaque match génère deux lignes (une par équipe), avec les colonnes \texttt{is\_home}, \texttt{points\_for}, \texttt{points\_against}.
   \item \textbf{Statistiques cumulatives} (window functions)~: pour chaque match, les statistiques sont calculées sur tous les matchs précédents (excluant le match courant)~:
-  \begin{itemize}
-    \item \texttt{win\_rate}, \texttt{avg\_points\_for}, \texttt{avg\_points\_against} --- cumulatifs
-    \item \texttt{win\_rate\_last5}, \texttt{avg\_points\_last5} --- fenêtre glissante de 5 matchs
-  \end{itemize}
+        \begin{itemize}
+          \item \texttt{win\_rate}, \texttt{avg\_points\_for}, \texttt{avg\_points\_against} --- cumulatifs
+          \item \texttt{win\_rate\_last5}, \texttt{avg\_points\_last5} --- fenêtre glissante de 5 matchs
+        \end{itemize}
   \item \textbf{Jours de repos}~: calcul du nombre de jours depuis le match précédent via \texttt{lag()} sur la date.
-  \item \textbf{Strength of Schedule} (SoS)~: fenêtre \textit{look-ahead} de 5 matchs pour calculer la difficulté du calendrier.
   \item \textbf{Vue match}~: jointure home/away pour produire une ligne par match avec les statistiques des deux équipes, utilisée comme entrée du modèle ML.
 \end{enumerate}
 
 \begin{table}[htbp]
-\centering
-\caption{KPIs calculés par le pipeline}
-\label{tab:kpis}
-\small
-\begin{tabular}{@{} l l p{5.2cm} @{}}
-\toprule
-\textbf{KPI} & \textbf{Granularité} & \textbf{Description} \\
-\midrule
-\texttt{win\_rate}           & Équipe/match & Taux de victoire cumulatif (avant ce match) \\
-\texttt{avg\_points\_for}    & Équipe/match & Moyenne de points marqués (cumulatif) \\
-\texttt{avg\_points\_against}& Équipe/match & Moyenne de points encaissés (cumulatif) \\
-\texttt{win\_rate\_last5}    & Équipe/match & Taux de victoire sur les 5 derniers matchs \\
-\texttt{avg\_points\_last5}  & Équipe/match & Moyenne de points marqués (5 derniers) \\
-\texttt{rest\_days}          & Équipe/match & Jours de repos avant le match \\
-\texttt{schedule\_difficulty\_next5} & Équipe/match & Difficulté du calendrier (5 prochains) \\
-\texttt{win\_probability\_home} & Match & Probabilité de victoire à domicile (ML) \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{KPIs calculés par le pipeline}
+  \label{tab:kpis}
+  \small
+  \begin{tabular}{@{} l l p{5.2cm} @{}}
+    \toprule
+    \textbf{KPI}                    & \textbf{Granularité} & \textbf{Description}                        \\
+    \midrule
+    \texttt{win\_rate}              & Équipe/match         & Taux de victoire cumulatif (avant ce match) \\
+    \texttt{avg\_points\_for}       & Équipe/match         & Moyenne de points marqués (cumulatif)       \\
+    \texttt{avg\_points\_against}   & Équipe/match         & Moyenne de points encaissés (cumulatif)     \\
+    \texttt{win\_rate\_last5}       & Équipe/match         & Taux de victoire sur les 5 derniers matchs  \\
+    \texttt{avg\_points\_last5}     & Équipe/match         & Moyenne de points marqués (5 derniers)      \\
+    \texttt{rest\_days}             & Équipe/match         & Jours de repos avant le match               \\
+    \texttt{win\_probability\_home} & Match                & Probabilité de victoire à domicile (ML)     \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \subsection{Schéma du flux de données Spark}
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[scale=0.82, every node/.append style={transform shape},
-  node distance=0.5cm and 0.7cm,
-  block/.style={rectangle, draw, rounded corners=2pt, minimum height=0.7cm, minimum width=2cm, font=\scriptsize\sffamily, align=center, line width=0.5pt},
-  data/.style={block, fill=gray!10},
-  job/.style={block, fill=spark!12, draw=spark!50},
-  outblock/.style={block, fill=combcolor!15, draw=combcolor!50},
-  arr/.style={-{Stealth[length=4pt]}, thick, gray!60},
-]
-  % Raw inputs
-  \node[data] (rawg) {raw/games\\(JSON)};
-  \node[data, below=0.3cm of rawg] (rawt) {raw/teams\\(JSON, bdl)};
-  \node[data, below=0.3cm of rawt] (raws) {raw/teams\\(JSON, sdb)};
+  \centering
+  \begin{tikzpicture}[scale=0.82, every node/.append style={transform shape},
+    node distance=0.5cm and 0.7cm,
+    block/.style={rectangle, draw, rounded corners=2pt, minimum height=0.7cm, minimum width=2cm, font=\scriptsize\sffamily, align=center, line width=0.5pt},
+    data/.style={block, fill=gray!10},
+    job/.style={block, fill=spark!12, draw=spark!50},
+    outblock/.style={block, fill=combcolor!15, draw=combcolor!50},
+    arr/.style={-{Stealth[length=4pt]}, thick, gray!60},
+    ]
+    % Raw inputs
+    \node[data] (rawg) {raw/games\\(JSON)};
+    \node[data, below=0.3cm of rawg] (rawt) {raw/teams\\(JSON, bdl)};
+    \node[data, below=0.3cm of rawt] (raws) {raw/teams\\(JSON, sdb)};
 
-  % Format jobs
-  \node[job, right=0.7cm of rawg] (fmtg) {format\_\\balldontlie};
-  \node[job, right=0.7cm of raws] (fmts) {format\_\\thesportsdb};
+    % Format jobs
+    \node[job, right=0.7cm of rawg] (fmtg) {format\_\\balldontlie};
+    \node[job, right=0.7cm of raws] (fmts) {format\_\\thesportsdb};
 
-  % Formatted
-  \node[data, right=0.7cm of fmtg] (pqg) {formatted/\\games (Parquet)};
-  \node[data, right=0.7cm of fmts] (pqs) {formatted/\\teams (Parquet)};
+    % Formatted
+    \node[data, right=0.7cm of fmtg] (pqg) {formatted/\\games (Parquet)};
+    \node[data, right=0.7cm of fmts] (pqs) {formatted/\\teams (Parquet)};
 
-  % Combine
-  \path (pqg) -- (pqs) coordinate[midway] (pqmid);
-  \node[job, right=0.7cm of pqmid] (comb) {combine\_\\metrics};
+    % Combine
+    \path (pqg) -- (pqs) coordinate[midway] (pqmid);
+    \node[job, right=0.7cm of pqmid] (comb) {combine\_\\metrics};
 
-  % Outputs
-  \node[outblock, right=0.7cm of comb, yshift=0.4cm] (tm) {team\_metrics};
-  \node[outblock, right=0.7cm of comb, yshift=-0.4cm] (mm) {match\_metrics};
+    % Outputs
+    \node[outblock, right=0.7cm of comb, yshift=0.4cm] (tm) {team\_metrics};
+    \node[outblock, right=0.7cm of comb, yshift=-0.4cm] (mm) {match\_metrics};
 
-  % ML
-  \node[job, right=0.7cm of mm] (ml) {train\_\\predict};
-  \node[outblock, right=0.7cm of ml] (pred) {with\_preds};
+    % ML
+    \node[job, right=0.7cm of mm] (ml) {train\_\\predict};
+    \node[outblock, right=0.7cm of ml] (pred) {with\_preds};
 
-  % Arrows
-  \draw[arr] (rawg) -- (fmtg);
-  \draw[arr] (rawt) -- (fmtg);
-  \draw[arr] (raws) -- (fmts);
-  \draw[arr] (fmtg) -- (pqg);
-  \draw[arr] (fmts) -- (pqs);
-  \draw[arr] (pqg.east) -| ([xshift=-0.3cm]comb.north west) -- (comb.north west);
-  \draw[arr] (pqs.east) -| ([xshift=-0.3cm]comb.south west) -- (comb.south west);
-  \draw[arr] (comb) -- (tm);
-  \draw[arr] (comb) -- (mm);
-  \draw[arr] (mm) -- (ml);
-  \draw[arr] (tm.east) -- ++(0.3,0) |- (ml.north west);
-  \draw[arr] (ml) -- (pred);
-\end{tikzpicture}
-\caption{Flux de données à travers les jobs Spark}
-\label{fig:spark-flow}
+    % Arrows
+    \draw[arr] (rawg) -- (fmtg);
+    \draw[arr] (rawt) -- (fmtg);
+    \draw[arr] (raws) -- (fmts);
+    \draw[arr] (fmtg) -- (pqg);
+    \draw[arr] (fmts) -- (pqs);
+    \draw[arr] (pqg.east) -| ([xshift=-0.3cm]comb.north west) -- (comb.north west);
+    \draw[arr] (pqs.east) -| ([xshift=-0.3cm]comb.south west) -- (comb.south west);
+    \draw[arr] (comb) -- (tm);
+    \draw[arr] (comb) -- (mm);
+    \draw[arr] (mm) -- (ml);
+    \draw[arr] (tm.east) -- ++(0.3,0) |- (ml.north west);
+    \draw[arr] (ml) -- (pred);
+  \end{tikzpicture}
+  \caption{Flux de données à travers les jobs Spark}
+  \label{fig:spark-flow}
 \end{figure}
 
 % ============================================================
@@ -401,33 +399,33 @@ L'objectif est de prédire la probabilité qu'une équipe jouant à domicile rem
 Le modèle utilise 18 features assemblées via \texttt{VectorAssembler} de PySpark ML, réparties en trois catégories~:
 
 \begin{table}[htbp]
-\centering
-\caption{Features du modèle Random Forest (18 features)}
-\label{tab:features}
-\small
-\begin{tabular}{@{} l p{7cm} @{}}
-\toprule
-\textbf{Feature} & \textbf{Description} \\
-\midrule
-\multicolumn{2}{@{}l}{\textit{Statistiques cumulatives (home + away)}} \\
-\texttt{home/away\_win\_rate}       & Taux de victoire cumulatif \\
-\texttt{home/away\_avg\_points}     & Moyenne de points marqués (cumulatif) \\
-\texttt{home/away\_avg\_points\_against} & Moyenne de points encaissés (cumulatif) \\
-\midrule
-\multicolumn{2}{@{}l}{\textit{Forme récente et contexte (home + away)}} \\
-\texttt{home/away\_win\_rate\_last5}  & Taux de victoire (5 derniers matchs) \\
-\texttt{home/away\_avg\_points\_last5} & Moyenne de points (5 derniers matchs) \\
-\texttt{home/away\_rest\_days}       & Jours de repos avant le match \\
-\midrule
-\multicolumn{2}{@{}l}{\textit{Features différentielles (engineered)}} \\
-\texttt{win\_rate\_diff}            & $\text{WR}_{\text{home}} - \text{WR}_{\text{away}}$ \\
-\texttt{avg\_points\_diff}          & $\overline{\text{pts}}_{\text{home}} - \overline{\text{pts}}_{\text{away}}$ \\
-\texttt{avg\_points\_against\_diff} & $\overline{\text{pts\_ag}}_{\text{away}} - \overline{\text{pts\_ag}}_{\text{home}}$ \\
-\texttt{rest\_days\_diff}           & $\text{repos}_{\text{home}} - \text{repos}_{\text{away}}$ \\
-\texttt{form\_last5\_diff}          & $\text{WR5}_{\text{home}} - \text{WR5}_{\text{away}}$ \\
-\texttt{home\_advantage}            & Bonus domicile ($\text{rest\_days} \times 0.02$) \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{Features du modèle Random Forest (18 features)}
+  \label{tab:features}
+  \small
+  \begin{tabular}{@{} l p{7cm} @{}}
+    \toprule
+    \textbf{Feature}                         & \textbf{Description}                                                                \\
+    \midrule
+    \multicolumn{2}{@{}l}{\textit{Statistiques cumulatives (home + away)}}                                                         \\
+    \texttt{home/away\_win\_rate}            & Taux de victoire cumulatif                                                          \\
+    \texttt{home/away\_avg\_points}          & Moyenne de points marqués (cumulatif)                                               \\
+    \texttt{home/away\_avg\_points\_against} & Moyenne de points encaissés (cumulatif)                                             \\
+    \midrule
+    \multicolumn{2}{@{}l}{\textit{Forme récente et contexte (home + away)}}                                                        \\
+    \texttt{home/away\_win\_rate\_last5}     & Taux de victoire (5 derniers matchs)                                                \\
+    \texttt{home/away\_avg\_points\_last5}   & Moyenne de points (5 derniers matchs)                                               \\
+    \texttt{home/away\_rest\_days}           & Jours de repos avant le match                                                       \\
+    \midrule
+    \multicolumn{2}{@{}l}{\textit{Features différentielles (engineered)}}                                                          \\
+    \texttt{win\_rate\_diff}                 & $\text{WR}_{\text{home}} - \text{WR}_{\text{away}}$                                 \\
+    \texttt{avg\_points\_diff}               & $\overline{\text{pts}}_{\text{home}} - \overline{\text{pts}}_{\text{away}}$         \\
+    \texttt{avg\_points\_against\_diff}      & $\overline{\text{pts\_ag}}_{\text{away}} - \overline{\text{pts\_ag}}_{\text{home}}$ \\
+    \texttt{rest\_days\_diff}                & $\text{repos}_{\text{home}} - \text{repos}_{\text{away}}$                           \\
+    \texttt{form\_last5\_diff}               & $\text{WR5}_{\text{home}} - \text{WR5}_{\text{away}}$                               \\
+    \texttt{home\_advantage}                 & Bonus domicile ($\text{rest\_days} \times 0.02$)                                    \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 Les valeurs manquantes sont imputées de manière contextualisée~: 0.5 pour les \textit{win rates}, 100.0 pour les moyennes de points, et 2.0 pour les jours de repos.
@@ -448,62 +446,84 @@ Le split train/test est \textbf{temporel} pour simuler un usage réaliste~:
 
 Ce protocole évite le \textit{data leakage} temporel~: le modèle n'a jamais accès à des données futures lors de l'entraînement. Les métriques utilisées sont l'AUC-ROC et l'accuracy.
 
+\subsection{Résultats}
+
+Le tableau~\ref{tab:ml-results} présente les performances mesurées sur le jeu de test (228 matchs, février--juin 2025).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Performance du modèle Random Forest sur le jeu de test}
+  \label{tab:ml-results}
+  \small
+  \begin{tabular}{@{} l c @{}}
+    \toprule
+    \textbf{Métrique}            & \textbf{Valeur}     \\
+    \midrule
+    Accuracy (test)              & 89.47\,\% (204/228) \\
+    AUC-ROC (test)               & 0.9246              \\
+    Baseline (toujours domicile) & 60.96\,\% (139/228) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Le modèle surpasse significativement la baseline naïve (``toujours prédire victoire domicile'') de près de 29 points de pourcentage en accuracy.
+
 \medskip\noindent\textbf{Sortie.} Le modèle produit pour chaque match une colonne \texttt{win\_probability\_home} $\in [0, 1]$, qui enrichit la table \texttt{match\_metrics\_with\_preds}.
 
 \subsection{Importance des features}
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-  % Random Forest feature importance (top 10, illustrative values based on typical RF output)
-  % Scale: value * 9 for bar width
-  \fill[spark!35, draw=spark!60] (0, 0.00) rectangle (0.90, 0.28);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.14) {home\_advantage};
-  \node[right, font=\tiny] at (0.95, 0.14) {0.03};
+  \centering
+  \begin{tikzpicture}
+    % Random Forest feature importance (top 10, illustrative values based on typical RF output)
+    % Scale: value * 9 for bar width
+    \fill[spark!35, draw=spark!60] (0, 0.00) rectangle (0.90, 0.28);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.14) {home\_advantage};
+    \node[right, font=\tiny] at (0.95, 0.14) {0.03};
 
-  \fill[spark!35, draw=spark!60] (0, 0.45) rectangle (1.35, 0.73);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.59) {rest\_days\_diff};
-  \node[right, font=\tiny] at (1.40, 0.59) {0.04};
+    \fill[spark!35, draw=spark!60] (0, 0.45) rectangle (1.35, 0.73);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.59) {rest\_days\_diff};
+    \node[right, font=\tiny] at (1.40, 0.59) {0.04};
 
-  \fill[spark!35, draw=spark!60] (0, 0.90) rectangle (1.80, 1.18);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.04) {form\_last5\_diff};
-  \node[right, font=\tiny] at (1.85, 1.04) {0.06};
+    \fill[spark!35, draw=spark!60] (0, 0.90) rectangle (1.80, 1.18);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.04) {form\_last5\_diff};
+    \node[right, font=\tiny] at (1.85, 1.04) {0.06};
 
-  \fill[spark!35, draw=spark!60] (0, 1.35) rectangle (2.25, 1.63);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.49) {away\_avg\_points};
-  \node[right, font=\tiny] at (2.30, 1.49) {0.07};
+    \fill[spark!35, draw=spark!60] (0, 1.35) rectangle (2.25, 1.63);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.49) {away\_avg\_points};
+    \node[right, font=\tiny] at (2.30, 1.49) {0.07};
 
-  \fill[spark!35, draw=spark!60] (0, 1.80) rectangle (2.70, 2.08);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.94) {home\_avg\_points};
-  \node[right, font=\tiny] at (2.75, 1.94) {0.08};
+    \fill[spark!35, draw=spark!60] (0, 1.80) rectangle (2.70, 2.08);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.94) {home\_avg\_points};
+    \node[right, font=\tiny] at (2.75, 1.94) {0.08};
 
-  \fill[spark!35, draw=spark!60] (0, 2.25) rectangle (3.60, 2.53);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.39) {avg\_points\_diff};
-  \node[right, font=\tiny] at (3.65, 2.39) {0.10};
+    \fill[spark!35, draw=spark!60] (0, 2.25) rectangle (3.60, 2.53);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.39) {avg\_points\_diff};
+    \node[right, font=\tiny] at (3.65, 2.39) {0.10};
 
-  \fill[spark!35, draw=spark!60] (0, 2.70) rectangle (4.50, 2.98);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.84) {avg\_pts\_ag\_diff};
-  \node[right, font=\tiny] at (4.55, 2.84) {0.12};
+    \fill[spark!35, draw=spark!60] (0, 2.70) rectangle (4.50, 2.98);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.84) {avg\_pts\_ag\_diff};
+    \node[right, font=\tiny] at (4.55, 2.84) {0.12};
 
-  \fill[spark!35, draw=spark!60] (0, 3.15) rectangle (5.40, 3.43);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.29) {away\_win\_rate};
-  \node[right, font=\tiny] at (5.45, 3.29) {0.14};
+    \fill[spark!35, draw=spark!60] (0, 3.15) rectangle (5.40, 3.43);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.29) {away\_win\_rate};
+    \node[right, font=\tiny] at (5.45, 3.29) {0.14};
 
-  \fill[spark!35, draw=spark!60] (0, 3.60) rectangle (6.30, 3.88);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.74) {home\_win\_rate};
-  \node[right, font=\tiny] at (6.35, 3.74) {0.16};
+    \fill[spark!35, draw=spark!60] (0, 3.60) rectangle (6.30, 3.88);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.74) {home\_win\_rate};
+    \node[right, font=\tiny] at (6.35, 3.74) {0.16};
 
-  \fill[spark!35, draw=spark!60] (0, 4.05) rectangle (7.65, 4.33);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 4.19) {win\_rate\_diff};
-  \node[right, font=\tiny] at (7.70, 4.19) {0.20};
+    \fill[spark!35, draw=spark!60] (0, 4.05) rectangle (7.65, 4.33);
+    \node[left, font=\scriptsize\ttfamily] at (-0.1, 4.19) {win\_rate\_diff};
+    \node[right, font=\tiny] at (7.70, 4.19) {0.20};
 
-  % Axis line
-  \draw[gray!60, -{Stealth[length=3pt]}] (0, -0.15) -- (8, -0.15);
-  \node[font=\scriptsize] at (3.75, -0.45) {Feature importance (Gini)};
-  \node[font=\small\bfseries] at (3.75, 4.70) {Top 10 features --- Random Forest};
-\end{tikzpicture}
-\caption{Importance des features par le critère de Gini du Random Forest (valeurs illustratives)}
-\label{fig:feature-importance}
+    % Axis line
+    \draw[gray!60, -{Stealth[length=3pt]}] (0, -0.15) -- (8, -0.15);
+    \node[font=\scriptsize] at (3.75, -0.45) {Feature importance (Gini)};
+    \node[font=\small\bfseries] at (3.75, 4.70) {Top 10 features --- Random Forest};
+  \end{tikzpicture}
+  \caption{Importance des features par le critère de Gini du Random Forest (valeurs illustratives)}
+  \label{fig:feature-importance}
 \end{figure}
 
 Le différentiel de \textit{win rate} (\texttt{win\_rate\_diff}) domine l'importance, suivi des taux de victoire individuels et du différentiel de points encaissés. Le Random Forest exploite naturellement les interactions entre ces features, ce qui explique le gain par rapport à la régression logistique initiale.
@@ -517,8 +537,8 @@ Le différentiel de \textit{win rate} (\texttt{win\_rate\_diff}) domine l'import
 Les données enrichies sont indexées dans deux indices Elasticsearch~:
 
 \begin{itemize}
-  \item \textbf{\texttt{nba\_team\_metrics}} (18 champs)~: métriques par équipe et par match --- forme récente, repos, difficulté du calendrier, informations de salle.
-  \item \textbf{\texttt{nba\_match\_metrics}} (9 champs)~: scores, résultat réel (\texttt{home\_win}), et prédiction ML (\texttt{win\_probability\_home}).
+  \item \textbf{\texttt{nba\_team\_metrics}} (14 champs)~: métriques par équipe et par match --- performance (points, victoires), contexte (domicile/extérieur), division et conférence.
+  \item \textbf{\texttt{nba\_match\_metrics}} (29 champs)~: scores, résultat réel (\texttt{home\_win}), prédiction ML (\texttt{win\_probability\_home}), et l'ensemble des features statistiques des deux équipes.
 \end{itemize}
 
 L'indexation est réalisée via les jobs Spark \texttt{index\_team\_metrics.py} et \texttt{index\_match\_metrics.py}, qui suppriment l'index existant puis effectuent un \textit{bulk indexing} par lots de 500 documents via l'API REST d'Elasticsearch. Cette stratégie de \textit{delete-then-reindex} garantit l'absence de doublons entre exécutions successives.
@@ -528,56 +548,56 @@ L'indexation est réalisée via les jobs Spark \texttt{index\_team\_metrics.py} 
 Six visualisations pré-configurées sont exportées dans \texttt{kibana/saved\_objects.json} et importables en une commande~:
 
 \begin{table}[htbp]
-\centering
-\caption{Visualisations Kibana pré-configurées}
-\label{tab:kibana}
-\small
-\begin{tabular}{@{} l l l @{}}
-\toprule
-\textbf{Visualisation} & \textbf{Type} & \textbf{Index} \\
-\midrule
-Win Rate par équipe         & Bar chart   & \texttt{nba\_team\_metrics} \\
-Avg Points (5 derniers)     & Bar chart   & \texttt{nba\_team\_metrics} \\
-Home vs Away Performance    & Pie chart   & \texttt{nba\_team\_metrics} \\
-Win Rate par conférence     & Bar chart   & \texttt{nba\_team\_metrics} \\
-Rest Days vs Win Rate       & Line chart  & \texttt{nba\_team\_metrics} \\
-Distribution Win Probability & Histogram  & \texttt{nba\_match\_metrics} \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{Visualisations Kibana pré-configurées}
+  \label{tab:kibana}
+  \small
+  \begin{tabular}{@{} l l l @{}}
+    \toprule
+    \textbf{Visualisation}       & \textbf{Type} & \textbf{Index}               \\
+    \midrule
+    Win Rate par équipe          & Bar chart     & \texttt{nba\_team\_metrics}  \\
+    Avg Points (5 derniers)      & Bar chart     & \texttt{nba\_team\_metrics}  \\
+    Home vs Away Performance     & Pie chart     & \texttt{nba\_team\_metrics}  \\
+    Win Rate par conférence      & Bar chart     & \texttt{nba\_team\_metrics}  \\
+    Rest Days vs Win Rate        & Line chart    & \texttt{nba\_team\_metrics}  \\
+    Distribution Win Probability & Histogram     & \texttt{nba\_match\_metrics} \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-  title={\small\textbf{Distribution des probabilités de victoire à domicile (Random Forest)}},
-  ybar interval=1,
-  width=10cm, height=4.8cm,
-  xlabel={\small Probabilité de victoire domicile},
-  ylabel={\small Nombre de matchs},
-  xmin=0, xmax=1,
-  ymin=0,
-  xtick={0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
-  xticklabel style={font=\scriptsize},
-  yticklabel style={font=\scriptsize},
-]
-\addplot[fill=airflow!30, draw=airflow!70] coordinates {
-  (0.0, 5)
-  (0.1, 15)
-  (0.2, 40)
-  (0.3, 135)
-  (0.4, 250)
-  (0.5, 85)
-  (0.6, 230)
-  (0.7, 120)
-  (0.8, 35)
-  (0.9, 10)
-  (1.0, 0)
-};
-\end{axis}
-\end{tikzpicture}
-\caption{Distribution des probabilités prédites par le Random Forest --- la distribution bimodale autour de 0.4 et 0.6 reflète les probabilités discrètes produites par les feuilles des arbres}
-\label{fig:win-prob-dist}
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+        title={\small\textbf{Distribution des probabilités de victoire à domicile (Random Forest)}},
+        ybar interval=1,
+        width=10cm, height=4.8cm,
+        xlabel={\small Probabilité de victoire domicile},
+        ylabel={\small Nombre de matchs},
+        xmin=0, xmax=1,
+        ymin=0,
+        xtick={0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
+        xticklabel style={font=\scriptsize},
+        yticklabel style={font=\scriptsize},
+      ]
+      \addplot[fill=airflow!30, draw=airflow!70] coordinates {
+          (0.0, 13)
+          (0.1, 13)
+          (0.2, 18)
+          (0.3, 19)
+          (0.4, 14)
+          (0.5, 20)
+          (0.6, 16)
+          (0.7, 28)
+          (0.8, 87)
+          (0.9, 0)
+          (1.0, 0)
+        };
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Distribution des probabilit\'es pr\'edites par le Random Forest --- la concentration dans la plage $[0.8, 0.9)$ refl\`ete la forte confiance du mod\`ele sur les matchs les plus d\'es\'equilibr\'es}
+  \label{fig:win-prob-dist}
 \end{figure}
 
 % ============================================================
@@ -589,65 +609,65 @@ Le pipeline est orchestré par un DAG Airflow (\texttt{nba\_pipeline}) configur�
 \subsection{Graphe de dépendances du DAG}
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-  node distance=0.6cm and 1.6cm,
-  task/.style={rectangle, draw, rounded corners=3pt, minimum height=0.65cm, font=\scriptsize\sffamily, align=center, fill=airflow!8, draw=airflow!40, line width=0.5pt},
-  arr/.style={-{Stealth[length=4pt]}, thick, airflow!50},
-]
-  % Ingestion
-  \node[task] (i1) {ingest\_\\balldontlie};
-  \node[task, below=0.8cm of i1] (i2) {ingest\_\\thesportsdb};
+  \centering
+  \begin{tikzpicture}[
+    node distance=0.6cm and 1.6cm,
+    task/.style={rectangle, draw, rounded corners=3pt, minimum height=0.65cm, font=\scriptsize\sffamily, align=center, fill=airflow!8, draw=airflow!40, line width=0.5pt},
+    arr/.style={-{Stealth[length=4pt]}, thick, airflow!50},
+    ]
+    % Ingestion
+    \node[task] (i1) {ingest\_\\balldontlie};
+    \node[task, below=0.8cm of i1] (i2) {ingest\_\\thesportsdb};
 
-  % Format
-  \node[task, right=1.4cm of i1] (f1) {format\_\\balldontlie};
-  \node[task, right=1.4cm of i2] (f2) {format\_\\thesportsdb};
+    % Format
+    \node[task, right=1.4cm of i1] (f1) {format\_\\balldontlie};
+    \node[task, right=1.4cm of i2] (f2) {format\_\\thesportsdb};
 
-  % Combine
-  \path (f1) -- (f2) coordinate[midway] (fmid);
-  \node[task, right=1.4cm of fmid] (comb) {combine\_\\metrics};
+    % Combine
+    \path (f1) -- (f2) coordinate[midway] (fmid);
+    \node[task, right=1.4cm of fmid] (comb) {combine\_\\metrics};
 
-  % Train
-  \node[task, right=1.4cm of comb] (train) {train\_\\predict};
+    % Train
+    \node[task, right=1.4cm of comb] (train) {train\_\\predict};
 
-  % Index
-  \node[task, right=1.4cm of train, yshift=0.4cm] (idx1) {index\_team\_\\metrics};
-  \node[task, right=1.4cm of train, yshift=-0.4cm] (idx2) {index\_match\_\\metrics};
+    % Index
+    \node[task, right=1.4cm of train, yshift=0.4cm] (idx1) {index\_team\_\\metrics};
+    \node[task, right=1.4cm of train, yshift=-0.4cm] (idx2) {index\_match\_\\metrics};
 
-  % Arrows
-  \draw[arr] (i1) -- (f1);
-  \draw[arr] (i2) -- (f2);
-  \draw[arr] (f1.east) -- ++(0.4,0) |- (comb);
-  \draw[arr] (f2.east) -- ++(0.4,0) |- (comb);
-  \draw[arr] (comb) -- (train);
-  \draw[arr] (train) -- (idx1);
-  \draw[arr] (train) -- (idx2);
-\end{tikzpicture}
-\caption{DAG Airflow du pipeline NBA --- les deux branches d'ingestion convergent vers la combinaison}
-\label{fig:dag}
+    % Arrows
+    \draw[arr] (i1) -- (f1);
+    \draw[arr] (i2) -- (f2);
+    \draw[arr] (f1.east) -- ++(0.4,0) |- (comb);
+    \draw[arr] (f2.east) -- ++(0.4,0) |- (comb);
+    \draw[arr] (comb) -- (train);
+    \draw[arr] (train) -- (idx1);
+    \draw[arr] (train) -- (idx2);
+  \end{tikzpicture}
+  \caption{DAG Airflow du pipeline NBA --- les deux branches d'ingestion convergent vers la combinaison}
+  \label{fig:dag}
 \end{figure}
 
 \subsection{Détail des tâches}
 
 \begin{table}[htbp]
-\centering
-\caption{Tâches du DAG Airflow}
-\label{tab:dag-tasks}
-\small
-\begin{tabular}{@{} l l p{5.5cm} @{}}
-\toprule
-\textbf{Tâche} & \textbf{Type} & \textbf{Description} \\
-\midrule
-\texttt{ingest\_balldontlie}  & Python  & Collecte matchs et équipes via l'API \\
-\texttt{ingest\_thesportsdb}  & Python  & Collecte détails équipes et salles \\
-\texttt{format\_balldontlie}  & Spark   & JSON $\to$ Parquet, normalisation, dédoublonnage \\
-\texttt{format\_thesportsdb}  & Spark   & JSON $\to$ Parquet, normalisation noms \\
-\texttt{combine\_metrics}     & Spark   & Jointure, KPIs, agrégations glissantes, SoS \\
-\texttt{train\_predict}       & Spark ML & Random Forest, prédiction \texttt{win\_prob} \\
-\texttt{index\_team\_metrics} & Spark   & Bulk indexing $\to$ Elasticsearch \\
-\texttt{index\_match\_metrics}& Spark   & Bulk indexing $\to$ Elasticsearch \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{Tâches du DAG Airflow}
+  \label{tab:dag-tasks}
+  \small
+  \begin{tabular}{@{} l l p{5.5cm} @{}}
+    \toprule
+    \textbf{Tâche}                 & \textbf{Type} & \textbf{Description}                             \\
+    \midrule
+    \texttt{ingest\_balldontlie}   & Python        & Collecte matchs et équipes via l'API             \\
+    \texttt{ingest\_thesportsdb}   & Python        & Collecte détails équipes et salles               \\
+    \texttt{format\_balldontlie}   & Spark         & JSON $\to$ Parquet, normalisation, dédoublonnage \\
+    \texttt{format\_thesportsdb}   & Spark         & JSON $\to$ Parquet, normalisation noms           \\
+    \texttt{combine\_metrics}      & Spark         & Jointure, KPIs, agrégations glissantes           \\
+    \texttt{train\_predict}        & Spark ML      & Random Forest, prédiction \texttt{win\_prob}     \\
+    \texttt{index\_team\_metrics}  & Spark         & Bulk indexing $\to$ Elasticsearch                \\
+    \texttt{index\_match\_metrics} & Spark         & Bulk indexing $\to$ Elasticsearch                \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 Chaque tâche Spark est soumise via \texttt{spark-submit} avec les packages Hadoop-AWS pour l'accès S3A à MinIO. Le DAG supporte trois modes d'exécution~: \textit{full run} (historique complet), \textit{incrémental} (depuis la dernière exécution), et \textit{all-files} (consolidation multi-batch).
@@ -659,44 +679,46 @@ Chaque tâche Spark est soumise via \texttt{spark-submit} avec les packages Hado
 L'ensemble de l'infrastructure est définie dans un fichier \texttt{docker-compose.yml} de 158 lignes, déployant 8 services interconnectés.
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-  node distance=0.4cm and 0.5cm,
-  svc/.style={rectangle, draw, rounded corners=2pt, minimum height=0.6cm, minimum width=2cm, font=\scriptsize\sffamily, align=center, line width=0.5pt},
-  arr/.style={-{Stealth[length=3pt]}, gray!50, thin},
-]
-  % Row 1: Airflow
-  \node[svc, fill=airflow!10, draw=airflow!40] (web) {Airflow\\Webserver\\:8080};
-  \node[svc, fill=airflow!10, draw=airflow!40, right=0.5cm of web] (sched) {Airflow\\Scheduler};
-  \node[svc, fill=postgres!10, draw=postgres!40, right=0.5cm of sched] (pg) {PostgreSQL\\:5432};
+  \centering
+  \begin{tikzpicture}[
+    node distance=0.4cm and 0.5cm,
+    svc/.style={rectangle, draw, rounded corners=2pt, minimum height=0.6cm, minimum width=2cm, font=\scriptsize\sffamily, align=center, line width=0.5pt},
+    arr/.style={-{Stealth[length=3pt]}, gray!50, thin},
+    ]
+    % Row 1: Airflow
+    \node[svc, fill=airflow!10, draw=airflow!40] (web) {Airflow\\Webserver\\:8080};
+    \node[svc, fill=airflow!10, draw=airflow!40, right=0.5cm of web] (sched) {Airflow\\Scheduler};
+    \node[svc, fill=postgres!10, draw=postgres!40, right=0.5cm of sched] (pg) {PostgreSQL\\:5432};
 
-  % Row 2: Spark + MinIO
-  \node[svc, fill=spark!10, draw=spark!40, below=0.6cm of web] (master) {Spark\\Master\\:7077};
-  \node[svc, fill=spark!10, draw=spark!40, right=0.5cm of master] (worker) {Spark\\Worker};
-  \node[svc, fill=minio!10, draw=minio!40, right=0.5cm of worker] (minio) {MinIO\\:9000};
+    % Row 2: Spark + MinIO
+    \node[svc, fill=spark!10, draw=spark!40, below=0.6cm of web] (master) {Spark\\Master\\:7077};
+    \node[svc, fill=spark!10, draw=spark!40, right=0.5cm of master] (worker) {Spark\\Worker};
+    \node[svc, fill=minio!10, draw=minio!40, right=0.5cm of worker] (minio) {MinIO\\:9000};
 
-  % Row 3: Elastic + Kibana
-  \node[svc, fill=elastic!10, draw=elastic!40, below=0.6cm of master] (es) {Elastic-\\search\\:9200};
-  \node[svc, fill=kibana!10, draw=kibana!40, right=0.5cm of es] (kib) {Kibana\\:5601};
+    % Row 3: Elastic + Kibana
+    \node[svc, fill=elastic!10, draw=elastic!40, below=0.6cm of master] (es) {Elastic-\\search\\:9200};
+    \node[svc, fill=kibana!10, draw=kibana!40, right=0.5cm of es] (kib) {Kibana\\:5601};
 
-  % Connections
-  \draw[arr] (web) -- (pg);
-  \draw[arr] (sched) -- (pg);
-  \draw[arr] (sched) -- (master);
-  \draw[arr] (master) -- (worker);
-  \draw[arr] (worker) -- (minio);
-  \draw[arr] (es) -- (kib);
+    % Connections
+    \draw[arr] (web) -- (pg);
+    \draw[arr] (sched) -- (pg);
+    \draw[arr] (sched) -- (master);
+    \draw[arr] (master) -- (worker);
+    \draw[arr] (worker) -- (minio);
+    \draw[arr] (es) -- (kib);
 
-  % Docker box
-  \begin{scope}[on background layer]
-    \node[draw=docker, dashed, rounded corners=5pt, fit=(web)(sched)(pg)(master)(worker)(minio)(es)(kib), inner sep=8pt, label={[font=\small\sffamily\color{docker}]above:Docker Compose}] {};
-  \end{scope}
-\end{tikzpicture}
-\caption{Services Docker Compose et leurs ports d'accès}
-\label{fig:docker}
+    % Docker box
+    \begin{scope}[on background layer]
+      \node[draw=docker, dashed, rounded corners=5pt, fit=(web)(sched)(pg)(master)(worker)(minio)(es)(kib), inner sep=8pt, label={[font=\small\sffamily\color{docker}]above:Docker Compose}] {};
+    \end{scope}
+  \end{tikzpicture}
+  \caption{Services Docker Compose et leurs ports d'accès}
+  \label{fig:docker}
 \end{figure}
 
 L'image Airflow est construite via un \textit{multi-stage build}~: elle embarque OpenJDK~17 et Apache Spark 3.5.8 pour pouvoir exécuter les jobs \texttt{spark-submit} directement depuis le scheduler. Les volumes persistants assurent la durabilité des données (MinIO, PostgreSQL, Elasticsearch).
+
+\medskip\noindent\textbf{Note sur le mode d'exécution Spark.} Par choix de simplicité pour le déploiement local, les jobs Spark sont soumis en mode \texttt{local[*]} depuis le conteneur Airflow scheduler/webserver. Les services Spark master et worker déployés dans le \texttt{docker-compose.yml} sont présents pour permettre une migration future vers un mode cluster distribué, mais ne sont pas utilisés dans la configuration actuelle. Ce choix permet d'éviter la complexité de la sérialisation réseau et des dépendances de fichiers entre conteneurs, au prix d'une scalabilité limitée à la machine hôte.
 
 % ============================================================
 \section{Conclusion}\label{sec:conclusion}
@@ -706,27 +728,29 @@ L'image Airflow est construite via un \textit{multi-stage build}~: elle embarque
 
 Ce projet implémente un pipeline big data complet et fonctionnel, couvrant l'ensemble de la chaîne de valeur~: ingestion multi-sources, stockage distribué en data lake, traitement Spark avec calcul de KPIs avancés, modèle de Machine Learning, indexation Elasticsearch et visualisation Kibana, le tout orchestré par Airflow et déployé en conteneurs Docker.
 
+\medskip\noindent\textbf{Performance du modèle ML.} Sur l'ensemble de test (228 matchs, février--juin 2025), le Random Forest atteint une \textbf{accuracy de 89.47\,\%} et un \textbf{AUC-ROC de 0.9246}, surpassant nettement la baseline naïve de 60.96\,\% (prédire systématiquement la victoire domicile).
+
 \begin{table}[htbp]
-\centering
-\caption{Couverture du cahier des charges}
-\label{tab:scoring}
-\small
-\begin{tabular}{@{} p{8.5cm} c @{}}
-\toprule
-\textbf{Critère} & \textbf{Statut} \\
-\midrule
-Ingestion $\geq$ 2 sources dans le Data Lake            & \checkmark \\
-Stockage distribué (MinIO/S3)                            & \checkmark \\
-Formatage Parquet avec Spark                             & \checkmark \\
-Normalisation (dates UTC, noms propres)                  & \checkmark \\
-Combinaison des sources + KPIs avec Spark                & \checkmark \\
-Machine Learning (Random Forest)                         & \checkmark \\
-Indexation Elasticsearch                                 & \checkmark \\
-Dashboard Kibana                                         & \checkmark \\
-Naming propre du Data Lake                               & \checkmark \\
-Orchestration Airflow (run-all-in-once)                  & \checkmark \\
-\bottomrule
-\end{tabular}
+  \centering
+  \caption{Couverture du cahier des charges}
+  \label{tab:scoring}
+  \small
+  \begin{tabular}{@{} p{8.5cm} c @{}}
+    \toprule
+    \textbf{Critère}                             & \textbf{Statut} \\
+    \midrule
+    Ingestion $\geq$ 2 sources dans le Data Lake & \checkmark      \\
+    Stockage distribué (MinIO/S3)                & \checkmark      \\
+    Formatage Parquet avec Spark                 & \checkmark      \\
+    Normalisation (dates UTC, noms propres)      & \checkmark      \\
+    Combinaison des sources + KPIs avec Spark    & \checkmark      \\
+    Machine Learning (Random Forest)             & \checkmark      \\
+    Indexation Elasticsearch                     & \checkmark      \\
+    Dashboard Kibana                             & \checkmark      \\
+    Naming propre du Data Lake                   & \checkmark      \\
+    Orchestration Airflow (run-all-in-once)      & \checkmark      \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \subsection{Limites}
@@ -734,7 +758,7 @@ Orchestration Airflow (run-all-in-once)                  & \checkmark \\
 \begin{itemize}
   \item \textbf{Features limitées}~: les APIs gratuites ne fournissent pas de statistiques avancées (PER, \textit{true shooting \%}, \textit{plus/minus}).
   \item \textbf{Plafond de performance}~: le Random Forest améliore la régression logistique initiale, mais reste limité par les features disponibles.
-  \item \textbf{SoS simplifié}~: la difficulté du calendrier utilise actuellement un proxy plutôt qu'un calcul complet intégrant le \textit{win rate} des adversaires.
+  \item \textbf{Spark en mode local}~: les jobs Spark s'exécutent en mode \texttt{local[*]} au sein du conteneur Airflow et non sur le cluster Spark dédié, ce qui simplifie le déploiement mais limite la scalabilité et n'exploite pas les conteneurs Spark master/worker déployés.
 \end{itemize}
 
 \subsection{Perspectives}
@@ -744,7 +768,8 @@ Orchestration Airflow (run-all-in-once)                  & \checkmark \\
   \item Tester des modèles plus expressifs~: XGBoost, \textit{gradient boosting}, ou réseaux de neurones.
   \item Implémenter un pipeline temps réel avec Apache Kafka pour les scores \textit{live}.
   \item Déployer sur un cluster Kubernetes avec auto-scaling et monitoring (Prometheus/Grafana).
-  \item Enrichir le SoS avec le \textit{win rate} des adversaires et un bonus back-to-back.
+  \item Implémenter un véritable \textit{Strength of Schedule} (SoS) mesurant la difficulté du calendrier via le \textit{win rate} des adversaires, le facteur domicile/extérieur, et les back-to-back.
+  \item Soumettre les jobs Spark au cluster distribué (master/worker) plutôt qu'en mode local.
 \end{itemize}
 
 \end{document}
