@@ -28,9 +28,9 @@ def spark_submit(cmd: str) -> str:
         "--conf spark.hadoop.fs.s3a.path.style.access=true "
         "--conf spark.executor.memory=2g "
         "--conf spark.driver.memory=2g "
-        "--py-files /opt/airflow/jobs/spark_utils.py "
-        f"--env ELASTIC_HOST=$ELASTIC_HOST "
-        f"--env ELASTIC_PORT=$ELASTIC_PORT " + cmd
+        f"--conf spark.env.ELASTIC_HOST=$ELASTIC_HOST "
+        f"--conf spark.env.ELASTIC_PORT=$ELASTIC_PORT "
+        "--py-files /opt/airflow/jobs/spark_utils.py " + cmd
     )
 
 
