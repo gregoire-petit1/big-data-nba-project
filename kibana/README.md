@@ -31,8 +31,8 @@ chmod +x kibana/import_saved_objects.sh
 | 4 | **Win Rate by Conference** | Bar Chart | East vs West comparison |
 | 5 | **Rest Days Impact** | Line Chart | Win rate by rest_days |
 | 6 | **Team Rankings Table** | Data Table | Teams ranked by multiple KPIs |
-| 7 | **Schedule Difficulty by Team** | Bar Chart | SOS (next 5) by team |
-| 8 | **SOS Ranking Table** | Data Table | Teams ranked by schedule difficulty |
+
+> **Note**: Schedule Difficulty (SoS) visualizations are not yet functional — the `schedule_difficulty_next5` field is currently a constant placeholder (1.0). See project perspectives for planned implementation.
 
 ### nba_match_metrics Index
 
@@ -86,25 +86,40 @@ Add these to your dashboard:
 ## Fields Reference
 
 ### nba_team_metrics
+
 - `team_name` - Team full name
+- `team_id` - Team ID
 - `conference` - East/West
 - `division` - Division name
-- `win_rate_last5` - Win rate (0-1)
-- `avg_points_last5` - Average points (last 5)
-- `home_away_diff` - Points diff at home
-- `rest_days` - Days since last game
+- `game_id` - Game ID
 - `game_date` - Date of game
-- `schedule_difficulty_next5` - Schedule difficulty (next 5 games)
-- `home_games_next5` - Number of home games in next 5
-- `away_games_next5` - Number of away games in next 5
+- `season` - NBA season year
+- `is_home` - 1 = home, 0 = away
+- `is_win` - 1 = win, 0 = loss
+- `points_for` - Points scored
+- `points_against` - Points conceded
+- `schedule_difficulty_next5` - Schedule difficulty (placeholder, constant 1.0)
+- `home_games_next5` - Home games next 5 (placeholder)
+- `away_games_next5` - Away games next 5 (placeholder)
 
-### nba_match_metrics
+### nba_match_metrics (29 fields)
+
+- `game_id` - Game ID
+- `game_date` - Date of match
 - `home_team_id` / `visitor_team_id` - Team IDs
+- `home_team_name` / `away_team_name` - Team names
 - `home_team_score` / `visitor_team_score` - Final scores
 - `home_win` - 1 = home win, 0 = away win
 - `win_probability_home` - ML prediction (0-1)
-- `season` - NBA season year
-- `game_date` - Date of match
+- `prediction` - Binary prediction (0 or 1)
+- `home_win_rate` / `away_win_rate` - Cumulative win rates
+- `home_avg_points` / `away_avg_points` - Avg points scored
+- `home_avg_points_against` / `away_avg_points_against` - Avg points conceded
+- `home_win_rate_last5` / `away_win_rate_last5` - Recent form (last 5)
+- `home_avg_points_last5` / `away_avg_points_last5` - Recent avg points
+- `home_rest_days` / `away_rest_days` - Rest days before game
+- `win_rate_diff` / `avg_points_diff` / `avg_points_against_diff` - Differential features
+- `rest_days_diff` / `form_last5_diff` / `home_advantage` - Context features
 
 ---
 

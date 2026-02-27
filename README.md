@@ -40,7 +40,6 @@ A complete big data pipeline for NBA analytics using Apache Spark, Apache Airflo
 
 ```
 big-data-nba-project/
-├── config/                 # Configuration files
 ├── dags/                   # Airflow DAGs
 │   └── nba_pipeline_dag.py
 ├── docker/                 # Docker configurations
@@ -189,41 +188,42 @@ Once the pipeline completes:
 
 1. **Ingestion**: Fetch data from APIs and store in MinIO (raw layer)
 2. **Formatting**: Clean and convert to Parquet (formatted layer)
-3. **Combination**: Join datasets and compute KPIs (combined layer) including Strength of Schedule
-4. **ML Prediction**: Train logistic regression model with home/away and differential features
+3. **Combination**: Join datasets and compute KPIs (combined layer)
+4. **ML Prediction**: Train Random Forest model with home/away and differential features
 5. **Indexing**: Load data into Elasticsearch for visualization
 
 ## Key Metrics
 
 ### Team Metrics
+
 - Win rate, average points, home/away performance
-- Schedule difficulty (next 5 games)
-- Home/away game distribution in upcoming schedule
 
 ### Match Metrics
-- Win probability (predicted via logistic regression)
+
+- Win probability (predicted via Random Forest, AUC-ROC: 0.92, Accuracy: 89%)
 - Rest days between games
-- Recent form (weighted by recency)
-- Strength of Schedule impact
+- Recent form (last 5 games)
 - Home/away differential features
 
 ## Development
 
 ### Running Spark Jobs Locally
 
+> **Note**: In the current configuration, Spark jobs run in `local[*]` mode inside the Airflow containers (not on the `spark-master`/`spark-worker` cluster). The Spark cluster containers are deployed for future migration to distributed mode.
+
 ```bash
 # Format balldontlie data
-docker-compose exec spark-master /opt/spark/bin/spark-submit /opt/spark/jobs/format_balldontlie.py
+docker-compose exec airflow-scheduler spark-submit --master 'local[*]' --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 --py-files /opt/airflow/jobs/spark_utils.py /opt/airflow/jobs/format_balldontlie.py
 
 # Combine metrics
-docker-compose exec spark-master /opt/spark/bin/spark-submit /opt/spark/jobs/combine_metrics.py
+docker-compose exec airflow-scheduler spark-submit --master 'local[*]' --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 --py-files /opt/airflow/jobs/spark_utils.py /opt/airflow/jobs/combine_metrics.py
 ```
 
 ### Running Ingestion Scripts
 
 ```bash
 # Ingest balldontlie data
-docker-compose exec airflow-webserver python /opt/airflow/ingestion/ingest_balldontlie.py --seasons 2022 2023 2024
+docker-compose exec airflow-webserver python /opt/airflow/ingestion/ingest_balldontlie.py --season-start 2024 --season-end 2024
 
 # Ingest TheSportsDB data
 docker-compose exec airflow-webserver python /opt/airflow/ingestion/ingest_thesportsdb.py --league NBA
