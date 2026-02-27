@@ -61,14 +61,16 @@ def main() -> None:
     config = SparkConfig()
     configure_spark(spark, config)
 
-    # Read match data - either single date or all dates
+    # Read match data
     if args.all_files:
         match_path = config.s3a_path("data/combined/nba/match_metrics/dt=*")
     else:
         match_path = config.s3a_path(f"data/combined/nba/match_metrics/dt={run_date}")
 
     match_df = spark.read.parquet(match_path)
-    print(f"Loaded {match_df.count()} matches")
+    match_df.cache()
+    count = match_df.count()
+    print(f"Loaded {count} matches")
 
     # Add features
     feature_cols = [
@@ -105,12 +107,12 @@ def main() -> None:
         print("WARNING: No test data found, using train for evaluation")
         test_df = train_df
 
-    # Train RandomForest model
+    # Train RandomForest model (reduced trees for faster execution)
     rf = RandomForestClassifier(
         featuresCol="features", 
         labelCol="home_label", 
-        numTrees=50,
-        maxDepth=5,
+        numTrees=10,
+        maxDepth=3,
         seed=42
     )
     

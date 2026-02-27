@@ -21,12 +21,16 @@ FULL_RUN = os.getenv("FULL_RUN", "true").lower() == "true"
 def spark_submit(cmd: str) -> str:
     return (
         "spark-submit "
-        "--master spark://spark-master:7077 "
+        "--master local[*] "
         "--deploy-mode client "
         "--packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 "
         "--conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem "
         "--conf spark.hadoop.fs.s3a.path.style.access=true "
-        "--py-files /opt/airflow/jobs/spark_utils.py " + cmd
+        "--conf spark.executor.memory=2g "
+        "--conf spark.driver.memory=2g "
+        "--py-files /opt/airflow/jobs/spark_utils.py "
+        f"--env ELASTIC_HOST=$ELASTIC_HOST "
+        f"--env ELASTIC_PORT=$ELASTIC_PORT " + cmd
     )
 
 
