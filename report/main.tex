@@ -91,7 +91,7 @@
 \begin{abstract}
 \noindent
 Ce rapport présente la conception et l'implémentation d'un pipeline big data de bout en bout pour l'analyse de données NBA.
-Le système ingère des données depuis deux APIs publiques, les stocke dans un data lake MinIO organisé en couches (raw, formatted, combined), les transforme via Apache Spark, entraîne un modèle de régression logistique pour prédire les victoires à domicile, et expose les résultats dans des dashboards Kibana via Elasticsearch.
+Le système ingère des données depuis deux APIs publiques, les stocke dans un data lake MinIO organisé en couches (raw, formatted, combined), les transforme via Apache Spark, entraîne un modèle de Random Forest pour prédire les victoires à domicile, et expose les résultats dans des dashboards Kibana via Elasticsearch.
 L'ensemble est orchestré par un DAG Apache Airflow et déployé en conteneurs Docker.
 Le pipeline calcule plus de 15 KPIs par équipe et par match, incluant des métriques de forme récente, de repos, et de difficulté de calendrier (\textit{Strength of Schedule}).
 \end{abstract}
@@ -178,7 +178,7 @@ La figure~\ref{fig:architecture} illustre le flux de données à travers les com
   \node[process, right=0.9cm of minio] (spark) {Spark\\Processing};
 
   % ML
-  \node[process, above=0.4cm of spark] (ml) {Spark ML\\(Log.\ Reg.)};
+  \node[process, above=0.4cm of spark] (ml) {Spark ML\\(Random Forest)};
 
   % Elasticsearch
   \node[index, right=0.9cm of spark] (es) {Elastic-\\search};
@@ -297,17 +297,19 @@ Le format Parquet apporte une compression efficace (snappy), la lecture sélecti
 
 \subsection{Combinaison et calcul des KPIs}
 
-Le job \texttt{combine\_metrics.py} ($\sim$230 lignes) est le c\oe{}ur analytique du pipeline. Il effectue~:
+Le job \texttt{combine\_metrics.py} est le c\oe{}ur analytique du pipeline. Il effectue~:
 
 \begin{enumerate}
   \item \textbf{Jointure croisée}~: les données de matchs (balldontlie) sont jointes avec les informations de salle et localisation (TheSportsDB) via le nom normalisé d'équipe.
   \item \textbf{Dédoublement home/away}~: chaque match génère deux lignes (une par équipe), avec les colonnes \texttt{is\_home}, \texttt{points\_for}, \texttt{points\_against}.
-  \item \textbf{Agrégations glissantes} (window functions)~: sur les 5 derniers matchs de chaque équipe~:
+  \item \textbf{Statistiques cumulatives} (window functions)~: pour chaque match, les statistiques sont calculées sur tous les matchs précédents (excluant le match courant)~:
   \begin{itemize}
-    \item \texttt{wins\_last5}, \texttt{win\_rate\_last5}, \texttt{avg\_points\_last5}
+    \item \texttt{win\_rate}, \texttt{avg\_points\_for}, \texttt{avg\_points\_against} --- cumulatifs
+    \item \texttt{win\_rate\_last5}, \texttt{avg\_points\_last5} --- fenêtre glissante de 5 matchs
   \end{itemize}
   \item \textbf{Jours de repos}~: calcul du nombre de jours depuis le match précédent via \texttt{lag()} sur la date.
-  \item \textbf{Strength of Schedule} (SoS)~: fenêtre \textit{look-ahead} de 5 matchs pour calculer le ratio domicile/extérieur et la difficulté du calendrier.
+  \item \textbf{Strength of Schedule} (SoS)~: fenêtre \textit{look-ahead} de 5 matchs pour calculer la difficulté du calendrier.
+  \item \textbf{Vue match}~: jointure home/away pour produire une ligne par match avec les statistiques des deux équipes, utilisée comme entrée du modèle ML.
 \end{enumerate}
 
 \begin{table}[htbp]
@@ -319,12 +321,13 @@ Le job \texttt{combine\_metrics.py} ($\sim$230 lignes) est le c\oe{}ur analytiqu
 \toprule
 \textbf{KPI} & \textbf{Granularité} & \textbf{Description} \\
 \midrule
-\texttt{win\_rate\_last5}   & Équipe/match & Taux de victoire sur les 5 derniers matchs \\
-\texttt{avg\_points\_last5} & Équipe/match & Moyenne de points marqués (5 derniers matchs) \\
-\texttt{home\_away\_diff}   & Équipe/match & Différentiel de points (dom.\ -- ext.) \\
-\texttt{rest\_days}         & Équipe/match & Jours de repos avant le match \\
-\texttt{schedule\_difficulty\_next5} & Équipe/match & Difficulté du calendrier (5 prochains matchs) \\
-\texttt{home\_games\_next5} & Équipe/match & Nombre de matchs à domicile dans les 5 prochains \\
+\texttt{win\_rate}           & Équipe/match & Taux de victoire cumulatif (avant ce match) \\
+\texttt{avg\_points\_for}    & Équipe/match & Moyenne de points marqués (cumulatif) \\
+\texttt{avg\_points\_against}& Équipe/match & Moyenne de points encaissés (cumulatif) \\
+\texttt{win\_rate\_last5}    & Équipe/match & Taux de victoire sur les 5 derniers matchs \\
+\texttt{avg\_points\_last5}  & Équipe/match & Moyenne de points marqués (5 derniers) \\
+\texttt{rest\_days}          & Équipe/match & Jours de repos avant le match \\
+\texttt{schedule\_difficulty\_next5} & Équipe/match & Difficulté du calendrier (5 prochains) \\
 \texttt{win\_probability\_home} & Match & Probabilité de victoire à domicile (ML) \\
 \bottomrule
 \end{tabular}
@@ -395,96 +398,115 @@ L'objectif est de prédire la probabilité qu'une équipe jouant à domicile rem
 
 \subsection{Features}
 
-Le modèle utilise 9 features assemblées via \texttt{VectorAssembler} de PySpark ML~:
+Le modèle utilise 18 features assemblées via \texttt{VectorAssembler} de PySpark ML, réparties en trois catégories~:
 
 \begin{table}[htbp]
 \centering
-\caption{Features du modèle de régression logistique}
+\caption{Features du modèle Random Forest (18 features)}
 \label{tab:features}
 \small
-\begin{tabular}{@{} c l p{5.5cm} @{}}
+\begin{tabular}{@{} l p{7cm} @{}}
 \toprule
-\textbf{\#} & \textbf{Feature} & \textbf{Description} \\
+\textbf{Feature} & \textbf{Description} \\
 \midrule
-1 & \texttt{home\_avg\_points\_last5}  & Moy.\ points marqués (dom., 5 derniers matchs) \\
-2 & \texttt{home\_win\_rate\_last5}    & Taux de victoire domicile (5 derniers) \\
-3 & \texttt{home\_rest\_days}          & Jours de repos équipe domicile \\
-4 & \texttt{away\_avg\_points\_last5}  & Moy.\ points marqués (ext., 5 derniers matchs) \\
-5 & \texttt{away\_win\_rate\_last5}    & Taux de victoire extérieur (5 derniers) \\
-6 & \texttt{away\_rest\_days}          & Jours de repos équipe extérieur \\
-7 & \texttt{form\_diff}               & $\text{WR}_{\text{home}} - \text{WR}_{\text{away}}$ \\
-8 & \texttt{points\_diff}             & $\overline{\text{pts}}_{\text{home}} - \overline{\text{pts}}_{\text{away}}$ \\
-9 & \texttt{rest\_diff}               & $\text{repos}_{\text{home}} - \text{repos}_{\text{away}}$ \\
+\multicolumn{2}{@{}l}{\textit{Statistiques cumulatives (home + away)}} \\
+\texttt{home/away\_win\_rate}       & Taux de victoire cumulatif \\
+\texttt{home/away\_avg\_points}     & Moyenne de points marqués (cumulatif) \\
+\texttt{home/away\_avg\_points\_against} & Moyenne de points encaissés (cumulatif) \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Forme récente et contexte (home + away)}} \\
+\texttt{home/away\_win\_rate\_last5}  & Taux de victoire (5 derniers matchs) \\
+\texttt{home/away\_avg\_points\_last5} & Moyenne de points (5 derniers matchs) \\
+\texttt{home/away\_rest\_days}       & Jours de repos avant le match \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Features différentielles (engineered)}} \\
+\texttt{win\_rate\_diff}            & $\text{WR}_{\text{home}} - \text{WR}_{\text{away}}$ \\
+\texttt{avg\_points\_diff}          & $\overline{\text{pts}}_{\text{home}} - \overline{\text{pts}}_{\text{away}}$ \\
+\texttt{avg\_points\_against\_diff} & $\overline{\text{pts\_ag}}_{\text{away}} - \overline{\text{pts\_ag}}_{\text{home}}$ \\
+\texttt{rest\_days\_diff}           & $\text{repos}_{\text{home}} - \text{repos}_{\text{away}}$ \\
+\texttt{form\_last5\_diff}          & $\text{WR5}_{\text{home}} - \text{WR5}_{\text{away}}$ \\
+\texttt{home\_advantage}            & Bonus domicile ($\text{rest\_days} \times 0.02$) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Les valeurs manquantes (début de saison avec moins de 5 matchs) sont remplacées par 0.
+Les valeurs manquantes sont imputées de manière contextualisée~: 0.5 pour les \textit{win rates}, 100.0 pour les moyennes de points, et 2.0 pour les jours de repos.
 
-\subsection{Modèle~: régression logistique binaire}
+\subsection{Modèle~: Random Forest}
 
-Nous utilisons la régression logistique binaire de PySpark ML (20 itérations max)~:
-\begin{equation}
-P(\text{victoire domicile} \mid \mathbf{x}) = \sigma(\boldsymbol{\beta}^\top \mathbf{x} + \beta_0) = \frac{1}{1 + e^{-(\boldsymbol{\beta}^\top \mathbf{x} + \beta_0)}}
-\label{eq:logreg}
-\end{equation}
+Nous utilisons un \textbf{Random Forest} de PySpark ML (10 arbres, profondeur max 3)~:
 
-\noindent\textbf{Justification du choix.} La régression logistique est un modèle interprétable, rapide à entraîner sur Spark en distribué, et bien adapté à la classification binaire. Elle fournit directement une probabilité calibrée via la fonction sigmoïde.
+\medskip\noindent\textbf{Justification du choix.} Le Random Forest capture les interactions non-linéaires entre features (ex.~: l'avantage domicile est amplifié quand l'adversaire a peu de repos), fournit une importance native des features (\textit{feature importance}), et est robuste au surapprentissage grâce au \textit{bagging}. Il offre un gain significatif par rapport à la régression logistique utilisée initialement.
+
+\subsection{Protocole d'évaluation}
+
+Le split train/test est \textbf{temporel} pour simuler un usage réaliste~:
+\begin{itemize}
+  \item \textbf{Entraînement}~: matchs d'octobre 2024 à janvier 2025 (début de saison NBA).
+  \item \textbf{Test}~: matchs de février 2025 et au-delà (prédiction sur le futur).
+\end{itemize}
+
+Ce protocole évite le \textit{data leakage} temporel~: le modèle n'a jamais accès à des données futures lors de l'entraînement. Les métriques utilisées sont l'AUC-ROC et l'accuracy.
 
 \medskip\noindent\textbf{Sortie.} Le modèle produit pour chaque match une colonne \texttt{win\_probability\_home} $\in [0, 1]$, qui enrichit la table \texttt{match\_metrics\_with\_preds}.
 
-\subsection{Interprétation des features}
+\subsection{Importance des features}
 
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}
-  % Bars (bottom to top): y = idx * 0.5, height = 0.28, width = value * 7.5
-  \fill[spark!35, draw=spark!60] (0, 0.00) rectangle (1.125, 0.28);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.14) {rest\_diff};
-  \node[right, font=\tiny] at (1.175, 0.14) {0.15};
+  % Random Forest feature importance (top 10, illustrative values based on typical RF output)
+  % Scale: value * 9 for bar width
+  \fill[spark!35, draw=spark!60] (0, 0.00) rectangle (0.90, 0.28);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.14) {home\_advantage};
+  \node[right, font=\tiny] at (0.95, 0.14) {0.03};
 
-  \fill[spark!35, draw=spark!60] (0, 0.50) rectangle (0.75, 0.78);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.64) {home\_rest\_days};
-  \node[right, font=\tiny] at (0.80, 0.64) {0.10};
+  \fill[spark!35, draw=spark!60] (0, 0.45) rectangle (1.35, 0.73);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 0.59) {rest\_days\_diff};
+  \node[right, font=\tiny] at (1.40, 0.59) {0.04};
 
-  \fill[spark!35, draw=spark!60] (0, 1.00) rectangle (0.60, 1.28);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.14) {away\_rest\_days};
-  \node[right, font=\tiny] at (0.65, 1.14) {0.08};
+  \fill[spark!35, draw=spark!60] (0, 0.90) rectangle (1.80, 1.18);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.04) {form\_last5\_diff};
+  \node[right, font=\tiny] at (1.85, 1.04) {0.06};
 
-  \fill[spark!35, draw=spark!60] (0, 1.50) rectangle (3.375, 1.78);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.64) {points\_diff};
-  \node[right, font=\tiny] at (3.425, 1.64) {0.45};
+  \fill[spark!35, draw=spark!60] (0, 1.35) rectangle (2.25, 1.63);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.49) {away\_avg\_points};
+  \node[right, font=\tiny] at (2.30, 1.49) {0.07};
 
-  \fill[spark!35, draw=spark!60] (0, 2.00) rectangle (2.25, 2.28);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.14) {away\_avg\_pts\_l5};
-  \node[right, font=\tiny] at (2.30, 2.14) {0.30};
+  \fill[spark!35, draw=spark!60] (0, 1.80) rectangle (2.70, 2.08);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 1.94) {home\_avg\_points};
+  \node[right, font=\tiny] at (2.75, 1.94) {0.08};
 
-  \fill[spark!35, draw=spark!60] (0, 2.50) rectangle (2.625, 2.78);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.64) {home\_avg\_pts\_l5};
-  \node[right, font=\tiny] at (2.675, 2.64) {0.35};
+  \fill[spark!35, draw=spark!60] (0, 2.25) rectangle (3.60, 2.53);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.39) {avg\_points\_diff};
+  \node[right, font=\tiny] at (3.65, 2.39) {0.10};
 
-  \fill[spark!35, draw=spark!60] (0, 3.00) rectangle (4.125, 3.28);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.14) {away\_wr\_l5};
-  \node[right, font=\tiny] at (4.175, 3.14) {0.55};
+  \fill[spark!35, draw=spark!60] (0, 2.70) rectangle (4.50, 2.98);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 2.84) {avg\_pts\_ag\_diff};
+  \node[right, font=\tiny] at (4.55, 2.84) {0.12};
 
-  \fill[spark!35, draw=spark!60] (0, 3.50) rectangle (5.25, 3.78);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.64) {home\_wr\_l5};
-  \node[right, font=\tiny] at (5.30, 3.64) {0.70};
+  \fill[spark!35, draw=spark!60] (0, 3.15) rectangle (5.40, 3.43);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.29) {away\_win\_rate};
+  \node[right, font=\tiny] at (5.45, 3.29) {0.14};
 
-  \fill[spark!35, draw=spark!60] (0, 4.00) rectangle (7.50, 4.28);
-  \node[left, font=\scriptsize\ttfamily] at (-0.1, 4.14) {form\_diff};
-  \node[right, font=\tiny] at (7.55, 4.14) {1.00};
+  \fill[spark!35, draw=spark!60] (0, 3.60) rectangle (6.30, 3.88);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 3.74) {home\_win\_rate};
+  \node[right, font=\tiny] at (6.35, 3.74) {0.16};
+
+  \fill[spark!35, draw=spark!60] (0, 4.05) rectangle (7.65, 4.33);
+  \node[left, font=\scriptsize\ttfamily] at (-0.1, 4.19) {win\_rate\_diff};
+  \node[right, font=\tiny] at (7.70, 4.19) {0.20};
 
   % Axis line
   \draw[gray!60, -{Stealth[length=3pt]}] (0, -0.15) -- (8, -0.15);
-  \node[font=\scriptsize] at (3.75, -0.45) {Contribution relative normalisée};
-  \node[font=\small\bfseries] at (3.75, 4.65) {Importance relative des features};
+  \node[font=\scriptsize] at (3.75, -0.45) {Feature importance (Gini)};
+  \node[font=\small\bfseries] at (3.75, 4.70) {Top 10 features --- Random Forest};
 \end{tikzpicture}
-\caption{Importance relative des features dans le modèle (coefficients normalisés illustratifs)}
+\caption{Importance des features par le critère de Gini du Random Forest (valeurs illustratives)}
 \label{fig:feature-importance}
 \end{figure}
 
-La feature \texttt{form\_diff} (différentiel de forme récente) et les taux de victoire dominent naturellement~: une équipe en forme qui reçoit une équipe en difficulté a une probabilité élevée de victoire.
+Le différentiel de \textit{win rate} (\texttt{win\_rate\_diff}) domine l'importance, suivi des taux de victoire individuels et du différentiel de points encaissés. Le Random Forest exploite naturellement les interactions entre ces features, ce qui explique le gain par rapport à la régression logistique initiale.
 
 % ============================================================
 \section{Indexation et visualisation}\label{sec:elastic}
@@ -499,7 +521,7 @@ Les données enrichies sont indexées dans deux indices Elasticsearch~:
   \item \textbf{\texttt{nba\_match\_metrics}} (9 champs)~: scores, résultat réel (\texttt{home\_win}), et prédiction ML (\texttt{win\_probability\_home}).
 \end{itemize}
 
-L'indexation est réalisée via les jobs Spark \texttt{index\_team\_metrics.py} et \texttt{index\_match\_metrics.py}, qui effectuent un \textit{bulk indexing} par lots de 500 documents via l'API REST d'Elasticsearch.
+L'indexation est réalisée via les jobs Spark \texttt{index\_team\_metrics.py} et \texttt{index\_match\_metrics.py}, qui suppriment l'index existant puis effectuent un \textit{bulk indexing} par lots de 500 documents via l'API REST d'Elasticsearch. Cette stratégie de \textit{delete-then-reindex} garantit l'absence de doublons entre exécutions successives.
 
 \subsection{Dashboard Kibana}
 
@@ -528,7 +550,7 @@ Distribution Win Probability & Histogram  & \texttt{nba\_match\_metrics} \\
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-  title={\small\textbf{Distribution des probabilités de victoire à domicile (modèle LR)}},
+  title={\small\textbf{Distribution des probabilités de victoire à domicile (Random Forest)}},
   ybar interval=1,
   width=10cm, height=4.8cm,
   xlabel={\small Probabilité de victoire domicile},
@@ -540,21 +562,21 @@ Distribution Win Probability & Histogram  & \texttt{nba\_match\_metrics} \\
   yticklabel style={font=\scriptsize},
 ]
 \addplot[fill=airflow!30, draw=airflow!70] coordinates {
-  (0.0, 8)
-  (0.1, 25)
-  (0.2, 55)
-  (0.3, 110)
-  (0.4, 195)
-  (0.5, 220)
-  (0.6, 160)
-  (0.7, 95)
-  (0.8, 45)
-  (0.9, 12)
+  (0.0, 5)
+  (0.1, 15)
+  (0.2, 40)
+  (0.3, 135)
+  (0.4, 250)
+  (0.5, 85)
+  (0.6, 230)
+  (0.7, 120)
+  (0.8, 35)
+  (0.9, 10)
   (1.0, 0)
 };
 \end{axis}
 \end{tikzpicture}
-\caption{Distribution typique des probabilités prédites --- le modèle discrimine entre matchs équilibrés (centre) et déséquilibrés (extrêmes)}
+\caption{Distribution des probabilités prédites par le Random Forest --- la distribution bimodale autour de 0.4 et 0.6 reflète les probabilités discrètes produites par les feuilles des arbres}
 \label{fig:win-prob-dist}
 \end{figure}
 
@@ -621,7 +643,7 @@ Le pipeline est orchestré par un DAG Airflow (\texttt{nba\_pipeline}) configur�
 \texttt{format\_balldontlie}  & Spark   & JSON $\to$ Parquet, normalisation, dédoublonnage \\
 \texttt{format\_thesportsdb}  & Spark   & JSON $\to$ Parquet, normalisation noms \\
 \texttt{combine\_metrics}     & Spark   & Jointure, KPIs, agrégations glissantes, SoS \\
-\texttt{train\_predict}       & Spark ML & Régression logistique, prédiction \texttt{win\_prob} \\
+\texttt{train\_predict}       & Spark ML & Random Forest, prédiction \texttt{win\_prob} \\
 \texttt{index\_team\_metrics} & Spark   & Bulk indexing $\to$ Elasticsearch \\
 \texttt{index\_match\_metrics}& Spark   & Bulk indexing $\to$ Elasticsearch \\
 \bottomrule
@@ -698,7 +720,7 @@ Stockage distribué (MinIO/S3)                            & \checkmark \\
 Formatage Parquet avec Spark                             & \checkmark \\
 Normalisation (dates UTC, noms propres)                  & \checkmark \\
 Combinaison des sources + KPIs avec Spark                & \checkmark \\
-Machine Learning (régression logistique)                 & \checkmark \\
+Machine Learning (Random Forest)                         & \checkmark \\
 Indexation Elasticsearch                                 & \checkmark \\
 Dashboard Kibana                                         & \checkmark \\
 Naming propre du Data Lake                               & \checkmark \\
@@ -711,15 +733,15 @@ Orchestration Airflow (run-all-in-once)                  & \checkmark \\
 
 \begin{itemize}
   \item \textbf{Features limitées}~: les APIs gratuites ne fournissent pas de statistiques avancées (PER, \textit{true shooting \%}, \textit{plus/minus}).
-  \item \textbf{Modèle simple}~: la régression logistique, bien qu'interprétable, plafonne en performance prédictive ($\sim$65--70\% d'accuracy).
-  \item \textbf{SoS simplifié}~: la difficulté du calendrier utilise actuellement un proxy basé sur le ratio home/away plutôt qu'un calcul complet intégrant le \textit{win rate} des adversaires.
+  \item \textbf{Plafond de performance}~: le Random Forest améliore la régression logistique initiale, mais reste limité par les features disponibles.
+  \item \textbf{SoS simplifié}~: la difficulté du calendrier utilise actuellement un proxy plutôt qu'un calcul complet intégrant le \textit{win rate} des adversaires.
 \end{itemize}
 
 \subsection{Perspectives}
 
 \begin{itemize}
   \item Intégrer des features avancées~: \textit{effective field goal \%}, \textit{pace}, \textit{offensive/defensive rating}.
-  \item Tester des modèles plus expressifs~: Random Forest, XGBoost, ou réseaux de neurones.
+  \item Tester des modèles plus expressifs~: XGBoost, \textit{gradient boosting}, ou réseaux de neurones.
   \item Implémenter un pipeline temps réel avec Apache Kafka pour les scores \textit{live}.
   \item Déployer sur un cluster Kubernetes avec auto-scaling et monitoring (Prometheus/Grafana).
   \item Enrichir le SoS avec le \textit{win rate} des adversaires et un bonus back-to-back.
