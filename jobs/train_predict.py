@@ -14,8 +14,6 @@ from spark_utils import SparkConfig, configure_spark
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and predict NBA match outcomes")
     parser.add_argument("--run-date", type=str, default=None)
-    parser.add_argument("--train-season", type=int, default=2024, help="Season year to use for training (start year)")
-    parser.add_argument("--test-season", type=int, default=2025, help="Season year to use for testing")
     parser.add_argument("--all-files", action="store_true", help="Read all match data files")
     return parser.parse_args()
 
@@ -72,15 +70,6 @@ def main() -> None:
     match_df = spark.read.parquet(match_path)
     print(f"Loaded {match_df.count()} matches")
 
-    # Determine season from game_date (NBA season runs Oct-Jun)
-    # 2024-2025 season: Oct 2024 - Jun 2025
-    # 2025-2026 season: Oct 2025 - Jun 2026
-    match_df = match_df.withColumn(
-        "season_year",
-        when(col("game_date") < "2025-10-01", lit(2024))  # Oct 2024 - Sep 2025 = 2024-2025
-        .otherwise(lit(2025))  # Oct 2025+ = 2025-2026
-    )
-
     # Add features
     feature_cols = [
         "home_win_rate", "home_avg_points", "home_avg_points_against",
@@ -94,17 +83,18 @@ def main() -> None:
     features_df = add_features(match_df)
     assembled = prepare_features(features_df, feature_cols)
 
-    # Split into train (2024-2025) and test (2025-2026)
-    train_season = args.train_season
-    test_season = args.test_season
+    # Split by time: regular season (train) vs rest of season (test)
+    # NBA 2024-25: Oct-Jan = regular season, Feb-Jun = playoffs/remaining
+    # Using Feb 1, 2025 as cutoff
+    train_cutoff = "2025-02-01"
     
-    train_df = assembled.filter(col("season_year") == train_season).filter(col("home_label").isNotNull())
-    test_df = assembled.filter(col("season_year") == test_season).filter(col("home_label").isNotNull())
+    train_df = assembled.filter(col("game_date") < train_cutoff).filter(col("home_label").isNotNull())
+    test_df = assembled.filter(col("game_date") >= train_cutoff).filter(col("home_label").isNotNull())
     
     train_count = train_df.count()
     test_count = test_df.count()
-    print(f"Training set (season {train_season}-{train_season+1}): {train_count} matches")
-    print(f"Test set (season {test_season}-{test_season+1}): {test_count} matches")
+    print(f"Training set (Oct 2024 - Jan 2025): {train_count} matches")
+    print(f"Test set (Feb 2025 - Jun 2025): {test_count} matches")
 
     if train_count == 0:
         print("ERROR: No training data found!")
@@ -142,19 +132,9 @@ def main() -> None:
     
     train_auc = evaluator_auc.evaluate(train_preds)
     train_acc = evaluator_acc.evaluate(train_preds, {evaluator_acc.metricName: "accuracy"})
-    print(f"\nTraining Metrics (season {train_season}-{train_season+1}):")
+    print(f"\nTraining Metrics (Oct 2024 - Jan 2025):")
     print(f"  AUC-ROC: {train_auc:.4f}")
     print(f"  Accuracy: {train_acc:.4f}")
-
-    # Predict on test set
-    test_preds = model.transform(test_df)
-    test_preds = test_preds.withColumn("prob_array", vector_to_array(col("probability")))
-    
-    test_auc = evaluator_auc.evaluate(test_preds)
-    test_acc = evaluator_acc.evaluate(test_preds, {evaluator_acc.metricName: "accuracy"})
-    print(f"\nTest Metrics (season {test_season}-{test_season+1}):")
-    print(f"  AUC-ROC: {test_auc:.4f}")
-    print(f"  Accuracy: {test_acc:.4f}")
 
     # Predict on test set (this is what we want to visualize)
     test_preds = model.transform(test_df)
@@ -162,7 +142,7 @@ def main() -> None:
     
     test_auc = evaluator_auc.evaluate(test_preds)
     test_acc = evaluator_acc.evaluate(test_preds, {evaluator_acc.metricName: "accuracy"})
-    print(f"\nTest Metrics (season {test_season}-{test_season+1}):")
+    print(f"\nTest Metrics (Feb 2025 - Jun 2025):")
     print(f"  AUC-ROC: {test_auc:.4f}")
     print(f"  Accuracy: {test_acc:.4f}")
 
@@ -170,7 +150,6 @@ def main() -> None:
     output = test_preds.select(
         "game_id",
         "game_date",
-        "season_year",
         "home_team_id",
         "visitor_team_id",
         "home_team_score",
